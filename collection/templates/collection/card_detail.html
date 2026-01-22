@@ -159,35 +159,22 @@ async function refreshCardStatus(cardId) {
     if (!res.ok) return;
 
     const product = await res.json();
-    const actionDiv = document.getElementById('buyAction');
+
+    const actionDiv = document.getElementById('buyBtn')?.parentElement;
     if (!actionDiv) return;
 
     if (product.is_sold_out) {
-      actionDiv.innerHTML = `
-        <div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">
+      actionDiv.innerHTML =
+        `<div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">
           Sold out
         </div>`;
-    } else if (product.is_reserved) {
-      actionDiv.innerHTML = `
-        <div class="px-4 py-2 bg-amber-500 text-zinc-900 rounded-md inline-block font-semibold">
-          Reserved
-        </div>`;
-    } else {
-      actionDiv.innerHTML = `
-        <button
-          id="buyBtn"
-          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-white"
-          onclick="buy(${cardId})"
-        >
-          Request to buy
-        </button>`;
     }
-
   } catch (e) {
     console.error('Failed to refresh card status:', e);
   }
 }
 
+setInterval(() => refreshCardStatus({{ product.id }}), 3000);
   async function buy(id) {
     try {
       const res = await fetch('/api/create-checkout-session/', {
@@ -206,7 +193,7 @@ async function refreshCardStatus(cardId) {
       alert('Checkout error: ' + (e.message || e));
     }
   }
-setInterval(() => refreshCardStatus({{ product.id }}), 3000);
+
 </script>
 
 </body>
