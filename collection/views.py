@@ -5,6 +5,7 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from .models import CollectionCard
 import stripe
+import time
 from django.db import transaction
 
 def get_sell_price(card: CollectionCard) -> float:
@@ -71,6 +72,8 @@ def create_checkout_session(request):
             # Stripe session
             price = get_sell_price(c)
             images = [request.build_absolute_uri(c.images.first().img.url)] if c.images.exists() else []
+            expires_in_seconds = 3 * 60
+            expires_at = int(time.time()) + expires_in_seconds
 
             description = f"Set: {c.card_set}, Edition: {c.edition}, Condition: {c.condition}, "
             description += f"PSA: {c.psa or 'N/A'}, Notes: {c.notes or 'None'}, "
@@ -94,6 +97,7 @@ def create_checkout_session(request):
                 mode='payment',
                 success_url=f"{settings.BASE_URL}/success/",
                 cancel_url=f"{settings.BASE_URL}/cancel/",
+                expires_at=expires_at,  # <-- set expiration
                 metadata={
                     'collection_card_id': str(c.id),
                     'reserved_qty': str(qty),

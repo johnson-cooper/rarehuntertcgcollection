@@ -45,6 +45,7 @@ class CollectionCard(models.Model):
     edition = models.CharField(max_length=50, default='Unlimited', blank=True)
     condition = models.CharField(max_length=20, blank=True)
     quantity = models.IntegerField(default=1)
+    reserved = models.IntegerField(default=0)
     misprint = models.TextField(null=True, blank=True)
     psa = models.CharField(max_length=255, null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
@@ -60,6 +61,11 @@ class CollectionCard(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+        # optional: helper property for available stock
+    @property
+    def available(self):
+        return self.quantity - self.reserved
 
     class Meta:
         constraints = [
