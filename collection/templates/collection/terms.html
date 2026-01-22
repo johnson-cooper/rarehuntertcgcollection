@@ -58,25 +58,28 @@
       For questions about these Terms of Service, orders, or products, contact us on <a href="https://instagram.com/rarehunter.tcg" class="text-indigo-500 hover:underline" target="_blank">Instagram</a>.
     </p>
   </div>
-   <!-- Footer -->
-    <footer class="mt-12 border-t border-zinc-800 pt-6 text-zinc-400 text-sm flex flex-col sm:flex-row sm:justify-between gap-2">
-      <div>© Rare Hunter TCG — {{ currentYear }}</div>
-      <div class="flex gap-4">
-    <a href="/" class="hover:text-indigo-500 transition">Collection</a>
-      <a href="/about" class="hover:text-indigo-500 transition">About</a>
-        <a href="/terms" class="hover:underline">Terms of Service</a>
-        <a href="/privacy" class="hover:underline">Privacy Policy</a>
-        <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:underline">Instagram</a>
-      </div>
-    </footer>
+<!-- Footer -->
+<footer class="mt-12 border-t border-zinc-800 pt-4 pb-4 text-zinc-400 text-sm">
+  <div class="max-w-7xl mx-auto px-4 flex flex-col items-center gap-2">
+    <!-- Brand + Date -->
+    <div class="text-center font-semibold">
+      Rare Hunter - TCG &copy; <span id="currentYear"></span>
+    </div>
 
+    <!-- Links -->
+    <div class="flex flex-wrap justify-center gap-3 text-xs">
+      <a href="/" class="hover:text-indigo-500 transition">Collection</a>
+      <a href="/about" class="hover:text-indigo-500 transition">About</a>
+      <a href="/terms" class="hover:text-indigo-500 transition">Terms</a>
+      <a href="/privacy" class="hover:text-indigo-500 transition">Privacy</a>
+      <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:text-indigo-500 transition">Instagram</a>
+    </div>
   </div>
+</footer>
 
 <script>
-  // Dynamically insert current year
-  document.querySelectorAll('footer div:first-child').forEach(el => {
-    el.textContent = `© Rare Hunter TCG — ${new Date().getFullYear()}`;
-  });
+  // Automatically set the current year
+  document.getElementById('currentYear').textContent = new Date().getFullYear();
 </script>
 </body>
 </html>
