@@ -15,7 +15,8 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['rarehuntertcgcollection-prod
 SECRET_KEY = env('SECRET_KEY', default='changeme')
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://rarehuntertcgcollection-production.up.railway.app'
+    'https://rarehuntertcgcollection-production.up.railway.app',
+    'https://collection.rarehuntertcg.com/',
 ]
 
 
