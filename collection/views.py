@@ -72,7 +72,7 @@ def create_checkout_session(request):
             # Stripe session
             price = get_sell_price(c)
             images = [request.build_absolute_uri(c.images.first().img.url)] if c.images.exists() else []
-            expires_in_seconds = 3 * 60
+            expires_in_seconds = 30 * 60
             expires_at = int(time.time()) + expires_in_seconds
 
             description = f"Set: {c.card_set}, Edition: {c.edition}, Condition: {c.condition}, "
