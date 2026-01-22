@@ -98,6 +98,7 @@ async function loadProducts(){
 // POPULATE SETS
 function populateSets(){
   const sel = el('setFilter');
+  sel.innerHTML = '<option value="">All Sets</option>';
   const sets = [...new Set(allProducts.map(p=>p.set?.name).filter(Boolean))].sort();
   sets.forEach(s=>{ const opt=document.createElement('option'); opt.value=s; opt.textContent=s; sel.appendChild(opt); });
 }
@@ -110,7 +111,8 @@ function buildCard(p){
   const status = p.is_sold_out?'soldout':p.is_reserved?'reserved':'available';
 
   const card = document.createElement('article');
-  card.className='bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col card-shadow transition-transform hover:scale-101';
+  // make it a column flex; inner content grows so actions stay at bottom
+  card.className='bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col card-shadow';
   card.innerHTML=`
     <a href="/api/card/${p.id}/" class="block relative">
       <div style="aspect-ratio:4/5" class="relative bg-zinc-800 overflow-hidden">
@@ -121,23 +123,29 @@ function buildCard(p){
         <div class="absolute right-3 top-3 px-2 py-1 rounded bg-zinc-900/60 text-xs">${escapeHtml(p.set?.code||'')}</div>
       </div>
     </a>
-    <div class="p-3 flex flex-col gap-2 text-sm">
+
+    <div class="p-3 flex flex-col gap-2 flex-1"> <!-- flex-1 makes the content stretch -->
       <a href="/api/card/${p.id}/" class="font-semibold hover:underline">${escapeHtml(p.name)}</a>
       <div class="text-zinc-400 text-xs">${escapeHtml(p.set?.name||'')} ${p.edition?'• '+escapeHtml(p.edition):''} ${p.condition?'• '+escapeHtml(p.condition):''}</div>
+
       <div class="flex items-center justify-between mt-2">
         <div class="text-lg font-bold">${formatMoney(p.price_cents)}</div>
       </div>
-      <div class="mt-3">
+
+      <div class="mt-3"></div> <!-- flexible spacer if needed -->
+
+      <!-- ACTIONS: always anchored to bottom -->
+      <div class="mt-auto">
         ${p.is_sold_out?`<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`:
           p.is_reserved?`<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`:
-          `<button class="buy-btn w-full px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 font-semibold" data-id="${p.id}">Buy</button>`}
+          `<button class="buy-btn w-full px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 font-semibold" data-id="${p.id}">Request to buy</button>`}
       </div>
     </div>
   `;
   const imgEl=card.querySelector('img');
   imgObserver.observe(imgEl);
   const buyBtn=card.querySelector('.buy-btn');
-  if(buyBtn) buyBtn.addEventListener('click',()=>buyItem(p.id));
+  if(buyBtn) buyBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); ev.preventDefault(); buyItem(p.id); });
   return card;
 }
 
@@ -186,7 +194,7 @@ el('setFilter').addEventListener('change',()=>{visibleCount=24;render();});
 el('sort').addEventListener('change',()=>{render();});
 el('loadMore').addEventListener('click',()=>{visibleCount+=24;render();});
 el('refreshBtn').addEventListener('click',()=>loadProducts());
-window.addEventListener('keydown',e=>{if(e.key==='Escape'){/* nothing, modal removed */}});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){/* no modal */}});
 
 // debounce util
 function debounce(fn,wait=250){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),wait);};}
