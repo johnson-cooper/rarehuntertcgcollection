@@ -1,1 +1,19 @@
-<html><body><h1>Payment success</h1></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payment Successful – Rare Hunter TCG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col justify-center items-center p-4">
+  <div class="max-w-md w-full text-center space-y-6">
+    <h1 class="text-3xl font-extrabold text-emerald-400">Payment Successful!</h1>
+    <p class="text-zinc-400 text-sm">
+      Your order has been received. You will be recieving order confirmation and shipping information shortly. Payment was securely processed by Stripe.
+    </p>
+    <a href="/" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold">Back to Store</a>
+    <p class="text-zinc-500 text-xs mt-4">&copy; Rare Hunter TCG {{ current_year }}</p>
+  </div>
+</body>
+</html>

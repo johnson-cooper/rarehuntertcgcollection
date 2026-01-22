@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>About — Rare Hunter TCG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans">
+  <div class="max-w-5xl mx-auto px-4 py-12">
+    
+    <a href="/" class="text-sm text-zinc-400 hover:underline">← Back to store</a>
+
+    <h1 class="text-3xl font-bold mt-6 mb-6">About Rare Hunter TCG</h1>
+
+    <p class="mb-4">
+      <strong>Rare Hunter TCG</strong> is a curated online store for collectors and enthusiasts of vintage Yu-Gi-Oh! trading cards. We specialize in rare singles, holographic cards, and 1st edition cards to help collectors build and expand their collections.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">Our Mission</h2>
+    <p class="mb-4">
+      Our mission is to make it easier for Yu-Gi-Oh! fans to find authentic, rare, and high-quality cards. We aim to provide a secure, reliable, and enjoyable shopping experience for collectors of all levels.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">What We Offer</h2>
+    <ul class="list-disc list-inside mb-4">
+      <li>Rare and vintage Yu-Gi-Oh! cards, including holographic and 1st editions.</li>
+      <li>Detailed product pages with images, edition, condition, and set information.</li>
+      <li>A secure checkout process via Stripe, with payment protection and shipping information.</li>
+      <li>Regularly updated inventory, so you can always find something new for your collection.</li>
+    </ul>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">Why Choose Us</h2>
+    <p class="mb-4">
+      We understand the passion of card collectors. Every item in our store is carefully verified for authenticity and quality. Our commitment to transparency, fast communication, and secure transactions makes Rare Hunter TCG a trusted source for Yu-Gi-Oh! cards.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">Contact Us</h2>
+    <p class="mb-4">
+      Have questions, requests, or looking for a specific card? Reach out to us on 
+      <a href="https://instagram.com/yourusername" class="text-indigo-500 hover:underline" target="_blank">Instagram</a>.
+    </p>
+
+    <!-- Footer -->
+    <footer class="mt-12 border-t border-zinc-800 pt-6 text-zinc-400 text-sm flex flex-col sm:flex-row sm:justify-between gap-2">
+      <div>© Rare Hunter TCG — {{ currentYear }}</div>
+      <div class="flex gap-4">
+    <a href="/" class="hover:text-indigo-500 transition">Collection</a>
+      <a href="/about" class="hover:text-indigo-500 transition">About</a>
+        <a href="/terms" class="hover:underline">Terms of Service</a>
+        <a href="/privacy" class="hover:underline">Privacy Policy</a>
+        <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:underline">Instagram</a>
+      </div>
+    </footer>
+
+  </div>
+
+<script>
+  // Dynamically insert current year
+  document.querySelectorAll('footer div:first-child').forEach(el => {
+    el.textContent = `© Rare Hunter TCG — ${new Date().getFullYear()}`;
+  });
+</script>
+
+</body>
+</html>

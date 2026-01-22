@@ -86,11 +86,13 @@
 
         <!-- Buy Action -->
         <div class="mt-4">
-            <p>Payments are made securely with Stripe. When requesting to buy, the item will be on hold for you for 30 minutes to complete payment.</p>
+            <p class="p-4">
+  Payments are made securely with Stripe. When requesting to buy, the item will be on hold for you for 30 minutes to complete payment.
+        </p>
           {% if product.is_sold_out %}
             <div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">Sold out</div>
           {% else %}
-            <button id="buyBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-white" onclick="buy({{ product.id }})">Buy now</button>
+            <button id="buyBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-white" onclick="buy({{ product.id }})">Request to buy</button>
           {% endif %}
         </div>
 
@@ -100,30 +102,33 @@
             <div class="mt-1">{{ product.notes }}</div>
           </div>
         {% endif %}
-<!-- Footer -->
-<footer class="mt-12 border-t border-zinc-800 pt-6 pb-4 text-zinc-400 text-sm">
-  <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-    <!-- Left: Brand + Date -->
-    <div>
-      <span class="font-semibold">Rare Hunter - TCG</span> &copy; <span id="currentYear"></span>
-    </div>
 
-    <!-- Right: Links -->
-    <div class="flex gap-4">
-      <a href="/terms" class="hover:text-indigo-500 transition">Terms of Service</a>
-      <a href="/privacy" class="hover:text-indigo-500 transition">Privacy Policy</a>
-      <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:text-indigo-500 transition">Instagram</a>
-    </div>
-  </div>
-</footer>
-
-<script>
-  // Automatically set the current year
-  document.getElementById('currentYear').textContent = new Date().getFullYear();
-</script>
       </div>
     </div>
   </div>
+
+  
+  
+ <!-- Footer -->
+    <footer class="mt-12 border-t border-zinc-800 pt-6 text-zinc-400 text-sm flex flex-col sm:flex-row sm:justify-between gap-2">
+      <div>© Rare Hunter TCG — {{ currentYear }}</div>
+      <div class="flex gap-4">
+    <a href="/" class="hover:text-indigo-500 transition">Collection</a>
+      <a href="/about" class="hover:text-indigo-500 transition">About</a>
+        <a href="/terms" class="hover:underline">Terms of Service</a>
+        <a href="/privacy" class="hover:underline">Privacy Policy</a>
+        <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:underline">Instagram</a>
+      </div>
+    </footer>
+
+  </div>
+
+<script>
+  // Dynamically insert current year
+  document.querySelectorAll('footer div:first-child').forEach(el => {
+    el.textContent = `© Rare Hunter TCG — ${new Date().getFullYear()}`;
+  });
+</script>
 
 <script>
   function getCookie(name) {

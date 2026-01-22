@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Terms of Service – Rare Hunter TCG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans">
+  <div class="max-w-5xl mx-auto px-4 py-12">
+    <h1 class="text-3xl font-bold mb-6">Terms of Service</h1>
+
+    <p class="mb-4">Welcome to <strong>Rare Hunter TCG</strong>. By using our website and purchasing products, you agree to the following terms and conditions. Please read them carefully.</p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">1. Our Service</h2>
+    <p class="mb-4">Rare Hunter TCG is an online store that sells vintage Yu-Gi-Oh! cards, including singles, holos, and first editions. You can browse products, view details, and purchase cards through our secure checkout system.</p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">2. Orders & Payments</h2>
+    <p class="mb-4">
+      All orders are processed through Stripe. When you click “Request to Buy,” you are creating a pending order that will be reviewed for availability. Payments are securely processed by Stripe. If a card is unavailable or the order is not approved, your payment will be refunded automatically.
+    </p>
+    <p class="mb-4">
+      Prices, quantities, and availability are subject to change. Rare Hunter TCG reserves the right to cancel orders if necessary.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">3. Shipping & Handling</h2>
+    <p class="mb-4">
+      Upon order approval, shipping information will be collected. We aim to ship all approved orders promptly. Delivery times may vary based on location and shipping method.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">4. Returns & Refunds</h2>
+    <p class="mb-4">
+      Returns are accepted only for damaged or incorrectly shipped cards. Contact us via Instagram or email within 7 days of delivery for assistance. Refunds are processed once the returned item is received and verified.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">5. Account Responsibilities</h2>
+    <p class="mb-4">
+      Users may browse and make purchases without creating an account. If you create an account, you are responsible for maintaining the confidentiality of your login credentials and for all activity on your account.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">6. Intellectual Property</h2>
+    <p class="mb-4">
+      All content on this website, including images, text, and product descriptions, is owned by Rare Hunter TCG or used with permission. Unauthorized use or reproduction of our content is prohibited.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">7. Limitation of Liability</h2>
+    <p class="mb-4">
+      Rare Hunter TCG is not liable for any indirect, incidental, or consequential damages arising from the use of this website or the purchase of products. We make every effort to ensure accuracy, but errors may occur.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">8. Changes to Terms</h2>
+    <p class="mb-4">
+      We reserve the right to update or modify these Terms of Service at any time. The most current version will always be posted on our website. Your continued use of the website constitutes acceptance of the updated terms.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">9. Contact Us</h2>
+    <p>
+      For questions about these Terms of Service, orders, or products, contact us on <a href="https://instagram.com/rarehunter.tcg" class="text-indigo-500 hover:underline" target="_blank">Instagram</a>.
+    </p>
+  </div>
+   <!-- Footer -->
+    <footer class="mt-12 border-t border-zinc-800 pt-6 text-zinc-400 text-sm flex flex-col sm:flex-row sm:justify-between gap-2">
+      <div>© Rare Hunter TCG — {{ currentYear }}</div>
+      <div class="flex gap-4">
+    <a href="/" class="hover:text-indigo-500 transition">Collection</a>
+      <a href="/about" class="hover:text-indigo-500 transition">About</a>
+        <a href="/terms" class="hover:underline">Terms of Service</a>
+        <a href="/privacy" class="hover:underline">Privacy Policy</a>
+        <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:underline">Instagram</a>
+      </div>
+    </footer>
+
+  </div>
+
+<script>
+  // Dynamically insert current year
+  document.querySelectorAll('footer div:first-child').forEach(el => {
+    el.textContent = `© Rare Hunter TCG — ${new Date().getFullYear()}`;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Privacy Policy – Rare Hunter TCG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans">
+  <div class="max-w-5xl mx-auto px-4 py-12">
+    <h1 class="text-3xl font-bold mb-6">Privacy Policy</h1>
+
+    <p class="mb-4">
+      Rare Hunter TCG values your privacy. This policy explains what data we collect, how we use it, and your rights as a customer.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">1. Information We Collect</h2>
+    <ul class="list-disc list-inside mb-4">
+      <li>Personal information you provide when placing orders (name, email, shipping address, phone number).</li>
+      <li>Payment information is handled securely by Stripe; Rare Hunter TCG does not store full credit card numbers.</li>
+      <li>Browser and usage data collected via cookies and analytics for site performance.</li>
+    </ul>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">2. How We Use Your Information</h2>
+    <ul class="list-disc list-inside mb-4">
+      <li>To process and fulfill your orders.</li>
+      <li>To communicate order updates and customer support.</li>
+      <li>To improve our website and products.</li>
+    </ul>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">3. Sharing Your Information</h2>
+    <p class="mb-4">
+      We do not sell your information. Personal data may be shared with service providers (like Stripe and shipping carriers) solely for fulfilling orders.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">4. Cookies & Tracking</h2>
+    <p class="mb-4">
+      We use cookies and analytics to improve your browsing experience and track product popularity. You may disable cookies in your browser, but some functionality may be affected.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">5. Security</h2>
+    <p class="mb-4">
+      We implement reasonable security measures to protect your information. However, no website is completely secure, and we cannot guarantee absolute protection.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">6. Your Rights</h2>
+    <p class="mb-4">
+      You may request access to, correction of, or deletion of your personal data. Contact us via Instagram or email for any privacy-related requests.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">7. Changes to This Policy</h2>
+    <p class="mb-4">
+      We may update this Privacy Policy periodically. The latest version is always available on our website. Continued use of the site indicates acceptance of any changes.
+    </p>
+
+    <h2 class="text-2xl font-semibold mt-6 mb-2">8. Contact Us</h2>
+    <p>
+      Questions regarding this Privacy Policy or your personal data can be directed to <a href="https://instagram.com/rarehunter.tcg" class="text-indigo-500 hover:underline" target="_blank">Instagram</a>.
+    </p>
+
+  </div>
+   <!-- Footer -->
+    <footer class="mt-12 border-t border-zinc-800 pt-6 text-zinc-400 text-sm flex flex-col sm:flex-row sm:justify-between gap-2">
+      <div>© Rare Hunter TCG — {{ currentYear }}</div>
+      <div class="flex gap-4">
+    <a href="/" class="hover:text-indigo-500 transition">Collection</a>
+      <a href="/about" class="hover:text-indigo-500 transition">About</a>
+        <a href="/terms" class="hover:underline">Terms of Service</a>
+        <a href="/privacy" class="hover:underline">Privacy Policy</a>
+        <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:underline">Instagram</a>
+      </div>
+    </footer>
+
+  </div>
+
+<script>
+  // Dynamically insert current year
+  document.querySelectorAll('footer div:first-child').forEach(el => {
+    el.textContent = `© Rare Hunter TCG — ${new Date().getFullYear()}`;
+  });
+</script>
+</body>
+</html>

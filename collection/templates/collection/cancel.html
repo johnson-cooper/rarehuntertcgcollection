@@ -1,1 +1,22 @@
-<html><body><h1>Payment canceled</h1></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payment Canceled – Rare Hunter TCG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col justify-center items-center p-4">
+  <div class="max-w-md w-full text-center space-y-6">
+    <h1 class="text-3xl font-extrabold text-red-500">Payment Canceled</h1>
+    <p class="text-zinc-400 text-sm">
+      Your payment was not completed. No charges were made. You can try again or contact us if you have questions.
+    </p>
+    <div class="flex gap-3 justify-center">
+      <a href="/" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded font-semibold">Back to Store</a>
+      <a href="mailto:support@rarehuntertcg.com" class="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 rounded font-semibold">Contact Support</a>
+    </div>
+    <p class="text-zinc-500 text-xs mt-4">&copy; Rare Hunter TCG {{ current_year }}</p>
+  </div>
+</body>
+</html>

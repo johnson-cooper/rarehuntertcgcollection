@@ -68,6 +68,8 @@
 
     <!-- Right: Links -->
     <div class="flex gap-4">
+      <a href="/" class="hover:text-indigo-500 transition">Collection</a>
+      <a href="/about" class="hover:text-indigo-500 transition">About</a>
       <a href="/terms" class="hover:text-indigo-500 transition">Terms of Service</a>
       <a href="/privacy" class="hover:text-indigo-500 transition">Privacy Policy</a>
       <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:text-indigo-500 transition">Instagram</a>
@@ -149,6 +151,7 @@ function buildCard(p){
     <div class="p-3 flex flex-col gap-2 flex-1"> <!-- flex-1 makes the content stretch -->
       <a href="/api/card/${p.id}/" class="font-semibold hover:underline">${escapeHtml(p.name)}</a>
       <div class="text-zinc-400 text-xs">${escapeHtml(p.set?.name||'')} ${p.edition?'• '+escapeHtml(p.edition):''} ${p.condition?'• '+escapeHtml(p.condition):''}</div>
+      ${p.misprint ? `<div class="text-yellow-400 text-xs mt-1">⚠ Misprint: ${escapeHtml(p.misprint)}</div>` : ''}
 
       <div class="flex items-center justify-between mt-2">
         <div class="text-lg font-bold">${formatMoney(p.price_cents)}</div>
@@ -158,7 +161,7 @@ function buildCard(p){
 
       <!-- ACTIONS: always anchored to bottom -->
       <div class="mt-auto">
-        <p>Payments are made securely with Stripe. When requesting to buy, the item will be on hold for you for 30 minutes to complete payment.</p>
+        
         ${p.is_sold_out?`<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`:
           p.is_reserved?`<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`:
           `<button class="buy-btn w-full px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 font-semibold" data-id="${p.id}">Request to buy</button>`}
