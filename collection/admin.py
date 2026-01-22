@@ -63,7 +63,13 @@ class ImportBatchAdmin(admin.ModelAdmin):
     def import_zip_data(self, batch, data, tmpdir):
         created = updated = deleted = 0
 
+        # Keep track of all exported_ids in the incoming import
+        incoming_ids = set()
+
         for c in data['cards']:
+            exported_id = c.get('id')
+            incoming_ids.add(exported_id)
+
             # --- Card ---
             card_obj, _ = Card.objects.get_or_create(
                 konami_id=c.get('konami_id'),
@@ -84,7 +90,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
 
             # --- CollectionCard ---
             coll_card, created_flag = CollectionCard.objects.get_or_create(
-                exported_id=c.get('id'),
+                exported_id=exported_id,
                 import_batch=batch,
                 defaults={
                     'card': card_obj,
@@ -106,6 +112,8 @@ class ImportBatchAdmin(admin.ModelAdmin):
                     'pricing_source': c.get('pricing', {}).get('source'),
                 }
             )
+
+            # Update existing card info
             if not created_flag:
                 coll_card.condition = c.get('condition')
                 coll_card.quantity = c.get('quantity', coll_card.quantity)
@@ -142,22 +150,38 @@ class ImportBatchAdmin(admin.ModelAdmin):
                             break
 
                     if img_file_path and os.path.exists(img_file_path):
-                        # Save image file
                         upload_path = os.path.join(settings.MEDIA_ROOT, img_filename)
                         os.makedirs(os.path.dirname(upload_path), exist_ok=True)
 
+                        # Delete old images for this card if any
+                        for old_img in coll_card.images.all():
+                            old_file_path = os.path.join(settings.MEDIA_ROOT, str(old_img.img))
+                            if os.path.exists(old_file_path):
+                                os.remove(old_file_path)
+                            old_img.delete()
+
+                        # Save new image file
                         with open(img_file_path, 'rb') as f:
                             with open(upload_path, 'wb') as dest:
                                 dest.write(f.read())
 
-                        # Save DB record only if not already linked
-                        db_img_path = img_filename  # relative to MEDIA_ROOT
+                        # Save DB record
+                        CollectionImage.objects.create(
+                            collection_card=coll_card,
+                            img=img_filename
+                        )
 
-                        if not coll_card.images.filter(img=db_img_path).exists():
-                            CollectionImage.objects.create(
-                                collection_card=coll_card,
-                                img=db_img_path
-                            )
+        # --- Delete CollectionCards that are no longer in the import ---
+        to_delete = CollectionCard.objects.filter(import_batch=batch).exclude(exported_id__in=incoming_ids)
+        for card in to_delete:
+            # Delete associated images
+            for img in card.images.all():
+                img_file = os.path.join(settings.MEDIA_ROOT, str(img.img))
+                if os.path.exists(img_file):
+                    os.remove(img_file)
+                img.delete()
+            card.delete()
+            deleted += 1
 
         return created, updated, deleted
 

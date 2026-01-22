@@ -1,4 +1,10 @@
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+import os
+from django.conf import settings
+
+
 
 class CollectionImport(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -76,3 +82,13 @@ class CollectionImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.collection_card}"
+
+
+@receiver(post_delete, sender=CollectionImage)
+def delete_image_file(sender, instance, **kwargs):
+    """Delete the image file from disk when CollectionImage is deleted."""
+    if instance.img:
+        img_path = os.path.join(settings.MEDIA_ROOT, str(instance.img))
+        if os.path.exists(img_path):
+            os.remove(img_path)
+
