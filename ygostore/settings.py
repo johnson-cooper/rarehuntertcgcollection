@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import environ
-
+import dj_database_url
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -55,9 +55,10 @@ TEMPLATES = [
 WSGI_APPLICATION = 'ygostore.wsgi.application'
 
 DATABASES = {
-    'default': env.db(
-        'DATABASE_URL',
-        default='postgresql://localhost/postgres'
+    'default': dj_database_url.config(
+        default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
+        conn_max_age=600,
+        ssl_require=True  # important for Neon
     )
 }
 
