@@ -11,13 +11,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / '.env') if os.path.exists('.env') else None
 DEBUG = env('DEBUG', default=True)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['collection.rarehuntertcg.com'])
 SECRET_KEY = env('SECRET_KEY', default='changeme')
-
-CSRF_TRUSTED_ORIGINS = [
-    'https://collection.rarehuntertcg.com'
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+ALLOWED_HOSTS = [
+    'collection.rarehuntertcg.com',
+    'www.collection.rarehuntertcg.com',
+    'rarehuntertcgcollection-production.up.railway.app',  # temporary
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://collection.rarehuntertcg.com',
+    'https://www.collection.rarehuntertcg.com',
+    'https://rarehuntertcgcollection-production.up.railway.app',  # temporary
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
