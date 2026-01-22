@@ -69,6 +69,40 @@ def api_products(request):
 
     return JsonResponse(out, safe=False)
 
+def card_detail(request, card_id):
+    c = CollectionCard.objects \
+        .select_related('card', 'card_set') \
+        .prefetch_related('images') \
+        .get(id=card_id)
+
+    img_url = ''
+    img = c.images.first()
+    if img and img.img:
+        img_url = request.build_absolute_uri(img.img.url)
+
+    price = get_sell_price(c)
+    available = c.quantity - c.reserved
+
+    product = {
+        'id': c.id,
+        'name': c.card.name,
+        'konami_id': c.card.konami_id,
+        'set': c.card_set,
+        'edition': c.edition,
+        'condition': c.condition,
+        'misprint': c.misprint,
+        'psa': c.psa,
+        'price': price,
+        'available': available,
+        'is_sold_out': available <= 0,
+        'image': img_url,
+        'notes': c.notes,
+    }
+
+    return render(request, 'collection/card_detail.html', {
+        'product': product
+    })
+
 @csrf_exempt
 def create_checkout_session(request):
     if request.method != 'POST':

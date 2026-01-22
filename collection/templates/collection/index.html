@@ -95,7 +95,9 @@ function render() {
     el.innerHTML = `
       <img src="${p.image || ''}" class="h-36 object-cover w-full" />
       <div class="p-3 flex flex-col gap-1 text-sm">
-        <div class="font-semibold">${p.name}</div>
+        <a href="/api/card/${p.id}/" class="font-semibold hover:underline">
+        ${p.name}
+        </a>
         <div class="text-zinc-400">${p.set?.code || ''}</div>
         <div>${p.condition} • ${p.edition}</div>
 
