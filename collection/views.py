@@ -15,19 +15,19 @@ def get_sell_price(card: CollectionCard) -> float:
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def about(request):
-    return render(request, "about.html")
+    return render(request, "collection/about.html")
 
 def terms(request):
-    return render(request, "terms.html")
+    return render(request, "collection/terms.html")
 
 def privacy(request):
-    return render(request, "privacy.html")
+    return render(request, "collection/privacy.html")
 
 def success(request):
-    return render(request, "success.html")
+    return render(request, "collection/success.html")
 
 def cancel(request):
-    return render(request, "cancel.html")
+    return render(request, "collection/cancel.html")
 
 def index(request):
     return render(request, 'collection/index.html', {
