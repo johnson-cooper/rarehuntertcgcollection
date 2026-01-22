@@ -1,50 +1,399 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-    <meta charset='utf-8' />
-    <meta name='viewport' content='width=device-width,initial-scale=1' />
-    <title>Store</title>
-    <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial; padding:20px}
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-    .card{border:1px solid #ddd;padding:10px;border-radius:8px}
-    img{width:100%;height:140px;object-fit:cover}
-    button{background:#6772e5;color:#fff;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rare Hunter TCG — Store</title>
+
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* Minor additions for polished dark look */
+    :root { color-scheme: dark; }
+    .card-img { height: 180px; object-fit: cover; width: 100%; }
+    
+    .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.03) 75%); background-size: 200% 100%; animation: shine 1.2s linear infinite; }
+    @keyframes shine { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+  </style>
 </head>
-<body>
-    <h1>Simple Store</h1>
-    <div id="grid" class="grid"></div>
-    <script>
-    async function loadProducts(){
-        const res = await fetch('/api/products/');
-        const data = await res.json();
-        const grid = document.getElementById('grid');
-        grid.innerHTML='';
-        data.forEach(p=>{
-            const el=document.createElement('div');
-            el.className='card';
-            el.innerHTML = `
-                <img src="${p.image||''}" alt="${p.name}"/>
-                <h3>${p.name}</h3>
-                <p>${(p.price_cents/100).toFixed(2)} ${p.currency}</p>
-                <p>Qty: ${p.available_qty}</p>
-                <button onclick="buy(${p.id})">Buy</button>
-            `;
-            grid.appendChild(el);
-        });
+<body class="bg-gray-900 text-gray-100 antialiased">
+
+  <header class="bg-gradient-to-b from-gray-800 to-gray-900 border-b border-gray-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <img src="/static/logo.png" alt="RareHunter" class="w-10 h-10 rounded-md object-cover bg-gray-700"/>
+        <div>
+          <h1 class="text-lg font-semibold">Rare Hunter TCG</h1>
+          <p class="text-xs text-gray-400">Vintage Yu-Gi-Oh! & Pokémon — curated collection</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 w-full max-w-xl">
+        <label for="search" class="sr-only">Search cards</label>
+        <input id="search" type="search" placeholder="Search name, set, edition, misprint..."
+               class="w-full bg-gray-800 border border-gray-700 placeholder-gray-400 text-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <select id="perPage" class="bg-gray-800 border border-gray-700 text-gray-200 rounded-md px-2 py-2">
+          <option value="12">12</option>
+          <option value="24" selected>24</option>
+          <option value="48">48</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <section class="flex items-center justify-between gap-4 mb-4">
+      <div class="text-sm text-gray-400">Showing <span id="resultCount">0</span> results</div>
+      <div class="flex items-center gap-2">
+        <button id="prevBtn" class="btn bg-gray-800 hover:bg-gray-700 text-gray-200 disabled:opacity-50" disabled>Previous</button>
+        <button id="nextBtn" class="btn bg-indigo-600 hover:bg-indigo-500 text-white">Next</button>
+      </div>
+    </section>
+
+    <!-- Grid -->
+    <section id="grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></section>
+
+    <!-- Loading / infinite sentinel -->
+    <div id="loading" class="mt-6 text-center text-gray-400 hidden">Loading…</div>
+    <div id="sentinel" class="h-2"></div>
+  </main>
+
+  <!-- Modal (details & buy) -->
+  <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="modalTitle" class="bg-gray-900 border border-gray-800 rounded-lg w-full max-w-2xl overflow-hidden">
+      <div class="flex items-start justify-between p-4 border-b border-gray-800">
+        <div>
+          <h2 id="modalTitle" class="text-lg font-semibold"></h2>
+          <p id="modalSubtitle" class="text-sm text-gray-400"></p>
+        </div>
+        <button id="closeModal" class="text-gray-400 hover:text-gray-200 text-2xl leading-none">&times;</button>
+      </div>
+
+      <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <img id="modalImg" class="w-full h-64 object-cover rounded-md md:col-span-1 bg-gray-800" alt="card image" />
+        <div class="md:col-span-2 space-y-3 text-sm text-gray-300">
+          <div><strong>Price</strong> — <span id="modalPrice" class="text-2xl font-bold">$0.00</span></div>
+          <div id="modalStock" class="text-sm text-gray-400"></div>
+          <div><strong>Set:</strong> <span id="modalSet"></span></div>
+          <div><strong>Edition:</strong> <span id="modalEdition"></span></div>
+          <div><strong>Condition:</strong> <span id="modalCondition"></span></div>
+          <div><strong>PSA:</strong> <span id="modalPSA"></span></div>
+          <div><strong>Misprint:</strong> <span id="modalMisprint"></span></div>
+          <div><strong>Notes:</strong> <div id="modalNotes" class="prose prose-sm prose-invert"></div></div>
+
+          <div class="flex items-center gap-3 mt-4">
+            <label for="qty" class="text-sm text-gray-300">Qty</label>
+            <input id="qty" type="number" min="1" value="1" class="w-20 bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-white" />
+            <button id="checkoutBtn" class="ml-auto bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md">Buy Now</button>
+            <button id="requestBtn" class="bg-yellow-500 hover:bg-yellow-400 text-black px-3 py-2 rounded-md">Request to Buy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ========= Config ========= */
+const API = '/api/products/';            // expects either: { results: [...], total: N } or [...]
+// server-side pagination params: ?page=1&per_page=24&q=search
+const CHECKOUT_API = '/api/create-checkout-session/';
+const perPageSelect = document.getElementById('perPage');
+const grid = document.getElementById('grid');
+const searchInput = document.getElementById('search');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const resultCountEl = document.getElementById('resultCount');
+const loadingEl = document.getElementById('loading');
+const sentinel = document.getElementById('sentinel');
+
+/* ========= State ========= */
+let page = 1;
+let perPage = Number(perPageSelect.value || 24);
+let total = null;                    // if server returns total
+let useServerPaging = true;          // optimistic default
+const cache = new Map();             // page -> results
+let query = '';
+let inFlight = false;
+let infinite = true;                 // enable infinite-scroll
+
+/* ========= Utilities ========= */
+const debounce = (fn, wait=300) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(()=>fn(...a), wait); }; };
+const money = v => Number(v || 0).toFixed(2);
+const fragmentFrom = (html) => { const f = document.createDocumentFragment(); const tmp = document.createElement('div'); tmp.innerHTML = html; while(tmp.firstChild) f.appendChild(tmp.firstChild); return f; };
+
+/* ========= Fetching (server-first) ========= */
+async function fetchPage(p=1, q='', per=perPage) {
+  // if cached, return quickly
+  const cacheKey = `${p}|${per}|${q}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  inFlight = true;
+  loadingEl.classList.remove('hidden');
+
+  // build URL with params
+  const url = new URL(API, location.origin);
+  url.searchParams.set('page', p);
+  url.searchParams.set('per_page', per);
+  if (q) url.searchParams.set('q', q);
+
+  try {
+    const res = await fetch(url.href, {cache: 'no-store'});
+    if (!res.ok) throw new Error('Network error');
+
+    const json = await res.json();
+
+    // Server returns { results: [...], total }  OR  [ ... ]
+    let results = [];
+    if (Array.isArray(json)) {
+      // fallback: server doesn't support pagination -> switch to client mode
+      useServerPaging = false;
+      results = json;
+      cache.set('all', results);
+      // compute pages locally below
+    } else if (json && Array.isArray(json.results)) {
+      results = json.results;
+      total = Number.isFinite(json.total) ? json.total : (json.results.length + (json.page || 0));
+    } else {
+      // unexpected shape -> treat as empty
+      results = [];
     }
-    async function buy(id){
-        const res = await fetch('/api/create-checkout-session/',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({collection_card_id:id, quantity:1})
-        });
-        const j = await res.json();
-        if (j.url) window.location = j.url;
-        else alert('Error: ' + (j.error||'unknown'));
+
+    cache.set(cacheKey, results);
+    return results;
+  } catch (e) {
+    console.error('fetchPage error', e);
+    throw e;
+  } finally {
+    inFlight = false;
+    loadingEl.classList.add('hidden');
+  }
+}
+
+/* ========= Rendering ========= */
+function renderItems(items, append=false) {
+  // efficient DOM update: use DocumentFragment
+  if (!append) grid.innerHTML = '';
+  const frag = document.createDocumentFragment();
+
+  for (const p of items) {
+    const available = (p.quantity || 0) - (p.reserved || 0);
+    const soldOut = available <= 0;
+    const reserved = (p.reserved || 0) > 0;
+
+    const safeName = escapeHtml(p.name || 'Unknown');
+    const img = (p.image || '/static/placeholder.png');
+
+    const html = `
+      <article class="bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shadow-sm flex flex-col">
+        <div class="relative">
+          <img loading="lazy" decoding="async" src="${img}" alt="${safeName}" class="card-img w-full bg-gray-700" />
+          ${soldOut ? `<span class="absolute left-2 top-2 bg-red-600 text-white text-xs px-2 py-1 rounded">Sold out</span>` 
+                   : reserved ? `<span class="absolute left-2 top-2 bg-yellow-600 text-black text-xs px-2 py-1 rounded">Reserved</span>` : ''}
+        </div>
+        <div class="p-4 flex flex-col flex-1 gap-2">
+          <h3 class="font-semibold text-lg">${safeName}</h3>
+          <div class="text-sm text-gray-400">${escapeHtml(p.card_set?.name || p.card_set || 'Unknown')}</div>
+          <div class="flex items-center justify-between mt-2">
+            <div>
+              <div class="text-lg font-bold">$${money(p.effective_mid)}</div>
+              <div class="text-xs text-gray-400">Qty: ${available} • Reserved: ${p.reserved || 0}</div>
+            </div>
+            <div class="flex flex-col gap-2">
+              <button data-id="${p.id}" class="buyBtn bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-md text-sm ${soldOut ? 'opacity-60 cursor-not-allowed' : ''}" ${soldOut ? 'disabled' : ''}>${soldOut ? 'Sold' : 'Buy'}</button>
+              <button data-id="${p.id}" class="detailBtn bg-gray-700 hover:bg-gray-600 text-gray-200 px-3 py-2 rounded-md text-sm">Details</button>
+            </div>
+          </div>
+        </div>
+      </article>
+    `;
+    frag.appendChild(fragmentFrom(html));
+  }
+
+  grid.appendChild(frag);
+
+  // connect handlers
+  grid.querySelectorAll('.buyBtn').forEach(b => b.onclick = () => buyNow(b.dataset.id));
+  grid.querySelectorAll('.detailBtn').forEach(b => b.onclick = () => openModal(b.dataset.id));
+}
+
+/* ========= Pagination & controls ========= */
+async function loadAndRenderPage(p=1, append=false) {
+  if (inFlight) return;
+  if (useServerPaging) {
+    const items = await fetchPage(p, query, perPage);
+    renderItems(items, append);
+    // update result count if server provided total, else show length of cached pages
+    if (total !== null) {
+      resultCountEl.textContent = total;
+      const totalPages = Math.max(1, Math.ceil(total / perPage));
+      prevBtn.disabled = page <= 1;
+      nextBtn.disabled = page >= totalPages;
+    } else {
+      // unknown total, simple enable/disable based on returned items
+      prevBtn.disabled = page <= 1;
+      nextBtn.disabled = (items.length < perPage);
+      resultCountEl.textContent = 'unknown';
     }
-    loadProducts();
-    </script>
+  } else {
+    // client-side fallback: fetch everything once and page locally
+    if (!cache.has('all')) {
+      const all = await fetchPage(1, '', 0); // this will set useServerPaging=false and cache 'all'
+      cache.set('all', all);
+    }
+    const all = cache.get('all') || [];
+    // filter client-side by query
+    const q = query.trim().toLowerCase();
+    const filtered = all.filter(p => {
+      const hay = `${p.name || ''} ${p.card_set?.name || p.card_set || ''} ${p.edition || ''} ${p.misprint?.description || p.misprint || ''}`.toLowerCase();
+      return !q || hay.includes(q);
+    });
+    resultCountEl.textContent = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+    const start = (p-1)*perPage;
+    const pageItems = filtered.slice(start, start+perPage);
+    renderItems(pageItems, append);
+    prevBtn.disabled = p <= 1;
+    nextBtn.disabled = p >= totalPages;
+  }
+}
+
+/* ========= Infinite scroll ========= */
+const io = new IntersectionObserver(entries => {
+  for (const ent of entries) {
+    if (!ent.isIntersecting) continue;
+    if (!infinite) continue;
+    // auto load next page
+    if (useServerPaging) {
+      // only if next enabled
+      if (!nextBtn.disabled && !inFlight) {
+        page++;
+        loadAndRenderPage(page, true);
+      }
+    } else {
+      // client-side: load next page if exists
+      page++;
+      loadAndRenderPage(page, true);
+    }
+  }
+}, { root: null, rootMargin: '400px', threshold: 0.1 });
+
+io.observe(sentinel);
+
+/* ========= Events ========= */
+searchInput.addEventListener('input', debounce(async (e) => {
+  query = e.target.value || '';
+  page = 1;
+  cache.clear(); // don't reuse cached pages when query changes
+  // optimistic: ask server for page 1 with q param
+  await loadAndRenderPage(1, false);
+}, 300));
+
+perPageSelect.addEventListener('change', () => {
+  perPage = Number(perPageSelect.value);
+  page = 1;
+  cache.clear();
+  loadAndRenderPage(1);
+});
+
+prevBtn.addEventListener('click', () => {
+  if (page <= 1) return;
+  page--;
+  loadAndRenderPage(page);
+});
+nextBtn.addEventListener('click', () => {
+  page++;
+  loadAndRenderPage(page);
+});
+
+/* ========= Modal logic ========= */
+const modal = document.getElementById('modal');
+const closeModal = document.getElementById('closeModal');
+closeModal.onclick = () => modal.classList.add('hidden');
+modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.classList.add('hidden'); });
+
+let currentDetail = null;
+function openModal(id) {
+  // try to find item in cache (pages)
+  let item = null;
+  for (const v of cache.values()) {
+    if (!Array.isArray(v)) continue;
+    item = v.find(x => String(x.id) === String(id));
+    if (item) break;
+  }
+  // fallback: fetch page 1 and find
+  if (!item) {
+    fetchPage(1, '').then(_ => {
+      for (const v of cache.values()) {
+        if (Array.isArray(v)) {
+          item = v.find(x => String(x.id) === String(id));
+          if (item) break;
+        }
+      }
+      if (item) showModal(item);
+    });
+    return;
+  }
+  showModal(item);
+}
+
+function showModal(p) {
+  currentDetail = p;
+  document.getElementById('modalTitle').textContent = p.name || 'Card';
+  document.getElementById('modalSubtitle').textContent = p.card_set?.name || p.card_set || '';
+  document.getElementById('modalImg').src = p.image || '/static/placeholder.png';
+  document.getElementById('modalPrice').textContent = '$' + money(p.effective_mid);
+  document.getElementById('modalStock').textContent = `Available: ${ (p.quantity || 0) - (p.reserved || 0) } • Reserved: ${p.reserved || 0}`;
+  document.getElementById('modalSet').textContent = p.card_set?.name || p.card_set || 'N/A';
+  document.getElementById('modalEdition').textContent = p.edition || 'Unlimited';
+  document.getElementById('modalCondition').textContent = p.condition || 'N/A';
+  document.getElementById('modalPSA').textContent = p.psa || 'N/A';
+  document.getElementById('modalMisprint').textContent = p.misprint?.description || p.misprint || 'None';
+  document.getElementById('modalNotes').textContent = p.notes || 'None';
+  modal.classList.remove('hidden');
+
+  // attach checkout
+  document.getElementById('checkoutBtn').onclick = () => {
+    const qty = Number(document.getElementById('qty').value || 1);
+    if ((p.quantity || 0) - (p.reserved || 0) < qty) {
+      alert('Not enough stock');
+      return;
+    }
+    buyNow(p.id, qty);
+  };
+  document.getElementById('requestBtn').onclick = () => alert('Request to Buy sent — implement server side endpoint to persist requests.');
+}
+
+/* ========= Checkout ========= */
+async function buyNow(id, qty=1) {
+  try {
+    const res = await fetch(CHECKOUT_API, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ collection_card_id: Number(id), quantity: Number(qty) })
+    });
+    const json = await res.json();
+    if (json.url) {
+      window.location.href = json.url;
+    } else {
+      alert('Checkout error: ' + (json.error || 'unknown'));
+    }
+  } catch (e) {
+    alert('Checkout failed: ' + e.message);
+  }
+}
+
+/* ========= Startup ========= */
+(async function init(){
+  // initial page load
+  page = 1;
+  await loadAndRenderPage(page);
+})();
+  
+/* ========= Helpers ========= */
+function escapeHtml(s='') {
+  return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+}
+</script>
 </body>
 </html>
