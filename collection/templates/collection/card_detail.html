@@ -167,7 +167,7 @@ async function refreshCardStatus(cardId) {
       alert('Checkout error: ' + (e.message || e));
     }
   }
-setInterval(() => refreshCardStatus({{ product.id }}), 10000);
+setInterval(() => refreshCardStatus({{ product.id }}), 3000);
 </script>
 
 </body>
