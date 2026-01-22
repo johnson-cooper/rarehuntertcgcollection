@@ -62,26 +62,32 @@ class ImportBatchAdmin(admin.ModelAdmin):
 
     def import_zip_data(self, batch, data, tmpdir):
         """
-        Import cards + images from JSON ZIP into a given ImportBatch.
-        Handles 'merge' and 'replace' modes.
-        Images are saved to MEDIA_ROOT and attached to CollectionCard.
+        Replace-capable importer:
+        - If batch.mode == 'replace' -> delete ALL CollectionImage files and CollectionCard rows first
+        - Then recreate CollectionCard rows from JSON and save images under MEDIA_ROOT with the same basename
+        - Merge mode behaves as before (only updates/creates)
         """
         created = updated = deleted = 0
         incoming_ids = set()
         is_replace = batch.mode == 'replace'
 
-        # --- REPLACE MODE: delete all old cards + images for this batch first ---
+        # ---------- FULL TABLE WIPE for REPLACE ----------
         if is_replace:
-            old_cards = CollectionCard.objects.filter(import_batch=batch)
-            for cc in old_cards:
-                for img in cc.images.all():
+            # Delete all image files and image rows
+            for img in CollectionImage.objects.all():
+                try:
                     path = os.path.join(settings.MEDIA_ROOT, str(img.img))
                     if os.path.exists(path):
                         os.remove(path)
-                    img.delete()
-                cc.delete()
-            deleted = old_cards.count()
+                except Exception:
+                    pass
+                img.delete()
 
+            # Delete all collection cards
+            deleted = CollectionCard.objects.count()
+            CollectionCard.objects.all().delete()
+
+        # ---------- IMPORT LOOP ----------
         for c in data.get('cards', []):
             exported_id = c.get('id')
             incoming_ids.add(exported_id)
@@ -89,7 +95,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
             # --- Card ---
             card_obj, _ = Card.objects.get_or_create(
                 konami_id=c.get('konami_id'),
-                defaults={'name': c['name']}
+                defaults={'name': c.get('name') or ''}
             )
 
             # --- CardSet ---
@@ -105,6 +111,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
                 )
 
             # --- CollectionCard ---
+            # In replace mode the table was just cleared so this will be None and we'll create a new row.
             coll_card = CollectionCard.objects.filter(
                 exported_id=exported_id,
                 import_batch=batch
@@ -118,7 +125,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
                         else c.get('misprint'))
             psa = c.get('psa')
             notes = c.get('notes')
-            pricing = c.get('pricing', {})
+            pricing = c.get('pricing', {}) or {}
             low = pricing.get('low')
             mid = pricing.get('mid')
             high = pricing.get('high')
@@ -126,7 +133,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
             pricing_source = pricing.get('source')
 
             if coll_card and not is_replace:
-                # --- MERGE mode: only fill missing data ---
+                # MERGE: only fill empty-ish fields (keep your original merge behavior)
                 if coll_card.card_set is None:
                     coll_card.card_set = card_set
                 if not coll_card.condition:
@@ -151,15 +158,20 @@ class ImportBatchAdmin(admin.ModelAdmin):
                 updated += 1
 
             else:
-                # --- REPLACE or new: delete old if exists ---
+                # REPLACE or new: ensure any existing single match is removed before creating
                 if coll_card:
+                    # delete previous images attached to that old row (should be rare in replace)
                     for img in coll_card.images.all():
-                        path = os.path.join(settings.MEDIA_ROOT, str(img.img))
-                        if os.path.exists(path):
-                            os.remove(path)
+                        try:
+                            path = os.path.join(settings.MEDIA_ROOT, str(img.img))
+                            if os.path.exists(path):
+                                os.remove(path)
+                        except Exception:
+                            pass
                         img.delete()
                     coll_card.delete()
 
+                # Create new CollectionCard (fresh)
                 coll_card = CollectionCard.objects.create(
                     card=card_obj,
                     card_set=card_set,
@@ -179,42 +191,38 @@ class ImportBatchAdmin(admin.ModelAdmin):
                 )
                 created += 1
 
-            # --- Images ---
-            img_data = c.get('images', {})
-            if img_data and img_data.get('img'):
-                img_filename = os.path.basename(img_data['img'])
+            # --- Images (copy from tmpdir -> MEDIA_ROOT and attach to the freshly-created coll_card) ---
+            img_data = c.get('images', {}) or {}
+            img_path_in_json = img_data.get('img') if isinstance(img_data, dict) else None
+            if img_path_in_json:
+                img_filename = os.path.basename(img_path_in_json)
 
-                # Copy image from tmpdir to MEDIA_ROOT
+                # find file in extracted zip tmpdir
+                found = None
                 for root, _, files in os.walk(tmpdir):
                     if img_filename in files:
-                        src = os.path.join(root, img_filename)
-                        dst = os.path.join(settings.MEDIA_ROOT, img_filename)
-                        os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
-                        with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
-                            fdst.write(fsrc.read())
-
-                        # Always attach to the current CollectionCard
-                        CollectionImage.objects.create(
-                            collection_card=coll_card,
-                            img=img_filename
-                        )
+                        found = os.path.join(root, img_filename)
                         break
 
-        # --- DELETE missing cards ONLY in replace mode ---
-        if is_replace:
-            to_delete = CollectionCard.objects.filter(import_batch=batch).exclude(
-                exported_id__in=incoming_ids
-            )
-            for card in to_delete:
-                for img in card.images.all():
-                    path = os.path.join(settings.MEDIA_ROOT, str(img.img))
-                    if os.path.exists(path):
-                        os.remove(path)
-                    img.delete()
-                card.delete()
-                deleted += 1
+                if found:
+                    dst = os.path.join(settings.MEDIA_ROOT, img_filename)
+                    os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+                    # copy/overwrite into MEDIA_ROOT
+                    with open(found, 'rb') as fsrc, open(dst, 'wb') as fdst:
+                        fdst.write(fsrc.read())
+
+                    # attach to the current CollectionCard: store the filename (relative to MEDIA_ROOT)
+                    CollectionImage.objects.create(
+                        collection_card=coll_card,
+                        img=img_filename
+                    )
+
+        # --- If you still want to delete any remaining old rows not present in JSON when using replace, you can do it,
+        #     but we've already nuked the table at the start of replace so there's nothing left to delete here. ---
+        # (keep for parity with previous logic if you switch to less-aggressive replace later)
 
         return created, updated, deleted
+
 
 
 
