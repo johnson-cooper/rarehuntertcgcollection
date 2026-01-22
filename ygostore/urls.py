@@ -9,4 +9,10 @@ urlpatterns = [
     path('', coll_views.index, name='home'),
     path('api/', include('collection.urls')),
     path('webhook/', coll_views.stripe_webhook, name='stripe-webhook'),
+     # Static pages
+    path('about/', coll_views.about, name='about'),
+    path('terms/', coll_views.terms, name='terms'),
+    path('privacy/', coll_views.privacy, name='privacy'),
+    path('success/', coll_views.success, name='success'),
+    path('cancel/', coll_views.cancel, name='cancel'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
