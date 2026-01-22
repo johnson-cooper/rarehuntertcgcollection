@@ -1,87 +1,50 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset='utf-8' />
-  <meta name='viewport' content='width=device-width,initial-scale=1' />
-  <title>Trading Card Store</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family: system-ui,Segoe UI,Roboto,Arial; padding:20px; background:#f9fafb; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
-    .card { background:white; border-radius:8px; padding:12px; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
-    img { width:100%; height:140px; object-fit:cover; border-radius:4px; }
-    button { background:#6772e5; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
-    button:disabled { background:#aaa; cursor:not-allowed; }
-  </style>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width,initial-scale=1' />
+    <title>Store</title>
+    <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial; padding:20px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+    .card{border:1px solid #ddd;padding:10px;border-radius:8px}
+    img{width:100%;height:140px;object-fit:cover}
+    button{background:#6772e5;color:#fff;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
+    </style>
 </head>
 <body>
-  <h1 class="text-2xl font-bold mb-4">Trading Card Store</h1>
-
-  <div class="flex mb-4 gap-2">
-    <input id="search" type="text" placeholder="Search by name, set, or edition" class="flex-1 px-3 py-2 rounded border">
-    <button id="prev" class="px-3 py-2 rounded border">Prev</button>
-    <button id="next" class="px-3 py-2 rounded border">Next</button>
-  </div>
-
-  <div id="grid" class="grid"></div>
-
-  <script>
-    let page = 1;
-    const perPage = 12;
-
-    async function loadProducts() {
-      const q = document.getElementById('search').value || '';
-      const res = await fetch(`/api/collectioncards/?page=${page}&q=${encodeURIComponent(q)}&page_size=${perPage}`);
-      const data = await res.json();
-
-      const grid = document.getElementById('grid');
-      grid.innerHTML = '';
-
-      data.results.forEach(p => {
-        const available = (p.quantity || 0) - (p.reserved || 0);
-        const status = available > 0 ? (p.reserved > 0 ? 'Reserved' : 'Available') : 'Sold Out';
-
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.innerHTML = `
-          <img src="${p.images?.[0]?.img || '/static/img/placeholder-card.png'}" alt="${p.card?.name || ''}">
-          <h3 class="font-semibold mt-2">${p.card?.name || ''}</h3>
-          <p class="text-sm text-gray-600">${p.card_set?.name || '-'} • ${p.edition || '-'} • ${p.condition || '-'}</p>
-          <p class="text-sm">Qty: ${p.quantity || 0} • Reserved: ${p.reserved || 0} • Available: ${available}</p>
-          <p class="text-sm font-semibold">Price: $${(p.effective_mid || p.value_mid || 0).toFixed(2)}</p>
-          <p class="text-xs mt-1 text-gray-500">Status: ${status}</p>
-          <button ${available <= 0 ? 'disabled' : ''} onclick="buy(${p.id})">Buy</button>
-        `;
-        grid.appendChild(el);
-      });
-
-      // handle prev/next buttons
-      document.getElementById('prev').disabled = page <= 1;
-      document.getElementById('next').disabled = !data.next; // your API should provide `next` link
+    <h1>Simple Store</h1>
+    <div id="grid" class="grid"></div>
+    <script>
+    async function loadProducts(){
+        const res = await fetch('/api/products/');
+        const data = await res.json();
+        const grid = document.getElementById('grid');
+        grid.innerHTML='';
+        data.forEach(p=>{
+            const el=document.createElement('div');
+            el.className='card';
+            el.innerHTML = `
+                <img src="${p.image||''}" alt="${p.name}"/>
+                <h3>${p.name}</h3>
+                <p>${(p.price_cents/100).toFixed(2)} ${p.currency}</p>
+                <p>Qty: ${p.available_qty}</p>
+                <button onclick="buy(${p.id})">Buy</button>
+            `;
+            grid.appendChild(el);
+        });
     }
-
-    async function buy(id) {
-      const res = await fetch('/api/collectioncards/' + id + '/purchase/', {
-        method:'POST',
-        headers:{'Content-Type':'application/json', 'X-CSRFToken': getCookie('csrftoken')},
-        credentials:'same-origin',
-        body: JSON.stringify({ quantity:1 })
-      });
-      const j = await res.json();
-      if (j.url) window.location = j.url;
-      else alert('Error: ' + (j.error||'unknown'));
+    async function buy(id){
+        const res = await fetch('/api/create-checkout-session/',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({collection_card_id:id, quantity:1})
+        });
+        const j = await res.json();
+        if (j.url) window.location = j.url;
+        else alert('Error: ' + (j.error||'unknown'));
     }
-
-    document.getElementById('search').addEventListener('input', () => { page = 1; loadProducts(); });
-    document.getElementById('prev').addEventListener('click', () => { if(page>1){page--; loadProducts();} });
-    document.getElementById('next').addEventListener('click', () => { page++; loadProducts(); });
-
-    function getCookie(name) {
-      const matches = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-      return matches ? decodeURIComponent(matches[2]) : null;
-    }
-
     loadProducts();
-  </script>
+    </script>
 </body>
 </html>
