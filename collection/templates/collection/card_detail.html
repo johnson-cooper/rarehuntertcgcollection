@@ -85,7 +85,7 @@
 
 
         <!-- Buy Action -->
-        <div class="mt-4">
+        <div class="mt-4" id="buyAction">
             <p class="p-4">
   Payments are made securely with Stripe. When requesting to buy, the item will be on hold for you for 30 minutes to complete payment.
         </p>
@@ -153,25 +153,35 @@
 
 async function refreshCardStatus(cardId) {
   try {
-    // fetch the latest product info from your API
-    const res = await fetch(`/api/card/${cardId}/`, { credentials: 'same-origin' });
+    const res = await fetch(`/api/card-status/${cardId}/`, {
+      credentials: 'same-origin'
+    });
     if (!res.ok) return;
-    const product = await res.json();
 
-    const actionDiv = document.querySelector('#buyBtn')?.parentElement;
+    const product = await res.json();
+    const actionDiv = document.getElementById('buyAction');
     if (!actionDiv) return;
 
-    // determine the current status
-    const status = product.is_sold_out ? 'soldout' : 'available';
-
-    // update button dynamically
-    actionDiv.innerHTML = status === 'soldout'
-      ? `<div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">Sold out</div>`
-      : `<button id="buyBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-white">Buy now</button>`;
-
-    // reattach click listener if available
-    const buyBtn = document.querySelector('#buyBtn');
-    if (buyBtn) buyBtn.addEventListener('click', () => buy(cardId));
+    if (product.is_sold_out) {
+      actionDiv.innerHTML = `
+        <div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">
+          Sold out
+        </div>`;
+    } else if (product.is_reserved) {
+      actionDiv.innerHTML = `
+        <div class="px-4 py-2 bg-amber-500 text-zinc-900 rounded-md inline-block font-semibold">
+          Reserved
+        </div>`;
+    } else {
+      actionDiv.innerHTML = `
+        <button
+          id="buyBtn"
+          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-white"
+          onclick="buy(${cardId})"
+        >
+          Request to buy
+        </button>`;
+    }
 
   } catch (e) {
     console.error('Failed to refresh card status:', e);
