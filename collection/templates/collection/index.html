@@ -162,16 +162,18 @@ function buildCard(p){
       <!-- ACTIONS: always anchored to bottom -->
       <div class="mt-auto">
         
-        ${p.is_sold_out?`<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`:
-          p.is_reserved?`<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`:
-          `<button class="buy-btn w-full px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 font-semibold" data-id="${p.id}">Request to buy</button>`}
+        ${p.is_sold_out
+  ? `<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`
+  : p.is_reserved
+  ? `<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`
+  : `<div class="px-3 py-2 bg-emerald-600 text-white rounded text-center font-semibold">Available</div>`}
+
       </div>
     </div>
   `;
   const imgEl=card.querySelector('img');
   imgObserver.observe(imgEl);
-  const buyBtn=card.querySelector('.buy-btn');
-  if(buyBtn) buyBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); ev.preventDefault(); buyItem(p.id); });
+ 
   return card;
 }
 
@@ -204,15 +206,7 @@ function render(){
   el('loadMore').style.display=(filtered.length>visibleCount)?'inline-block':'none';
 }
 
-// BUY
-async function buyItem(id){
-  try{
-    const res=await fetch(CHECKOUT,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({collection_card_id:id,quantity:1})});
-    const j=await res.json();
-    if(j.url) window.location=j.url;
-    else alert(j.error||'Checkout failed');
-  }catch(e){ alert('Checkout error: '+e.message); }
-}
+
 
 async function refreshStatuses() {
   try {
@@ -232,15 +226,14 @@ async function refreshStatuses() {
       const status = p.is_sold_out?'soldout':p.is_reserved?'reserved':'available';
 
       // update button or label dynamically
-      actionDiv.innerHTML = status==='soldout'
+      actionDiv.innerHTML = status === 'soldout'
         ? `<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`
-        : status==='reserved'
+        : status === 'reserved'
         ? `<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`
-        : `<button class="buy-btn w-full px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 font-semibold" data-id="${p.id}">Request to buy</button>`;
+        : `<div class="px-3 py-2 bg-emerald-600 text-white rounded text-center font-semibold">Available</div>`;
 
       // reattach event listener if button exists
-      const buyBtn = actionDiv.querySelector('.buy-btn');
-      if (buyBtn) buyBtn.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); buyItem(p.id); });
+      
     });
   } catch(e) {
     console.error("Failed to refresh statuses:", e);
