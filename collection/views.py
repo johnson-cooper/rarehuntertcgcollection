@@ -30,48 +30,40 @@ def api_products(request):
     for c in qs:
         # image
         img_url = ''
-        if c.images.exists():
-            img = c.images.first()
-            if img.img:
-                img_url = request.build_absolute_uri(img.img.url)
+        img = c.images.first()
+        if img and img.img:
+            img_url = request.build_absolute_uri(img.img.url)
 
         price = get_sell_price(c)
         available = c.quantity - c.reserved
 
         out.append({
-            # core identity
             'id': c.id,
             'name': c.card.name,
-            'konami_id': c.card.konami_id,
+            'konami_id': getattr(c.card, 'konami_id', None),
 
-            # set info
             'set': {
                 'name': c.card_set.name if c.card_set else None,
-                'code': c.card_set.code if c.card_set else None,
-                'release_date': c.card_set.release_date if c.card_set else None,
+                'code': getattr(c.card_set, 'code', None),
             },
 
-            # card details
-            'edition': c.edition,
-            'condition': c.condition,
-            'misprint': c.misprint_description if c.misprint_description else None,
-            'graded': bool(c.psa_grade),
-            'psa_grade': c.psa_grade,
+            # ⚠️ SAFE field access
+            'edition': getattr(c, 'edition', None),
+            'condition': getattr(c, 'condition', None),
+            'misprint': getattr(c, 'misprint', None),
+            'graded': bool(getattr(c, 'psa', None)),
+            'psa_grade': getattr(c, 'psa', None),
 
-            # pricing
             'price_cents': int(price * 100),
             'currency': 'USD',
 
-            # inventory truth
             'quantity': c.quantity,
             'reserved': c.reserved,
             'available': available,
 
-            # frontend helpers
             'is_sold_out': available <= 0,
             'is_reserved': c.reserved > 0 and available > 0,
 
-            # media
             'image': img_url,
         })
 
