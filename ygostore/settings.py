@@ -11,11 +11,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / '.env') if os.path.exists('.env') else None
 DEBUG = env('DEBUG', default=True)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['https://collection.rarehuntertcg.com/'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['collection.rarehuntertcg.com'])
 SECRET_KEY = env('SECRET_KEY', default='changeme')
 
 CSRF_TRUSTED_ORIGINS = [
-    'https://collection.rarehuntertcg.com/'
+    'collection.rarehuntertcg.com'
 ]
 
 
@@ -83,4 +83,4 @@ MEDIA_URL = '/media/'
 # Stripe configuration
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
-BASE_URL = env('BASE_URL', default='https://collection.rarehuntertcg.com/')
+BASE_URL = env('BASE_URL', default='collection.rarehuntertcg.com')
