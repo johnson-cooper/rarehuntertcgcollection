@@ -7,11 +7,27 @@ from .models import CollectionCard
 import stripe
 import time
 from django.db import transaction
+from django.shortcuts import render
 
 def get_sell_price(card: CollectionCard) -> float:
     return card.effective_mid or card.value_mid or 0
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
+
+def about(request):
+    return render(request, "about.html")
+
+def terms(request):
+    return render(request, "terms.html")
+
+def privacy(request):
+    return render(request, "privacy.html")
+
+def success(request):
+    return render(request, "success.html")
+
+def cancel(request):
+    return render(request, "cancel.html")
 
 def index(request):
     return render(request, 'collection/index.html', {
