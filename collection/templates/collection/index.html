@@ -1,50 +1,138 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-    <meta charset='utf-8' />
-    <meta name='viewport' content='width=device-width,initial-scale=1' />
-    <title>Store</title>
-    <style>
-    body{font-family:system-ui,Segoe UI,Roboto,Arial; padding:20px}
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-    .card{border:1px solid #ddd;padding:10px;border-radius:8px}
-    img{width:100%;height:140px;object-fit:cover}
-    button{background:#6772e5;color:#fff;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rare Hunter TCG</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    }
+  </script>
 </head>
-<body>
-    <h1>Simple Store</h1>
-    <div id="grid" class="grid"></div>
-    <script>
-    async function loadProducts(){
-        const res = await fetch('/api/products/');
-        const data = await res.json();
-        const grid = document.getElementById('grid');
-        grid.innerHTML='';
-        data.forEach(p=>{
-            const el=document.createElement('div');
-            el.className='card';
-            el.innerHTML = `
-                <img src="${p.image||''}" alt="${p.name}"/>
-                <h3>${p.name}</h3>
-                <p>${(p.price_cents/100).toFixed(2)} ${p.currency}</p>
-                <p>Qty: ${p.available_qty}</p>
-                <button onclick="buy(${p.id})">Buy</button>
-            `;
-            grid.appendChild(el);
-        });
+
+<body class="dark bg-zinc-950 text-zinc-100 min-h-screen">
+
+  <!-- Header -->
+  <header class="max-w-7xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-bold tracking-tight">Rare Hunter TCG</h1>
+    <p class="text-sm text-zinc-400">Vintage Yu-Gi-Oh! Singles</p>
+  </header>
+
+  <!-- Search -->
+  <div class="max-w-7xl mx-auto px-4 mb-6">
+    <input
+      id="searchInput"
+      type="text"
+      placeholder="Search cards…"
+      class="w-full md:w-96 px-4 py-2 rounded bg-zinc-900 border border-zinc-800 focus:outline-none focus:ring focus:ring-indigo-500"
+    />
+  </div>
+
+  <!-- Grid -->
+  <main class="max-w-7xl mx-auto px-4">
+    <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
+
+    <!-- Load more -->
+    <div class="flex justify-center my-8">
+      <button
+        id="loadMoreBtn"
+        class="px-6 py-2 rounded bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold"
+      >
+        Load more
+      </button>
+    </div>
+  </main>
+
+  <script>
+    let allProducts = [];
+    let visibleCount = 20;
+
+    async function loadProducts() {
+      const res = await fetch('/api/products/');
+      allProducts = await res.json();
+      render();
     }
-    async function buy(id){
-        const res = await fetch('/api/create-checkout-session/',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({collection_card_id:id, quantity:1})
-        });
-        const j = await res.json();
+
+    function render() {
+      const grid = document.getElementById('grid');
+      const q = document.getElementById('searchInput').value.toLowerCase();
+
+      const filtered = allProducts.filter(p =>
+        p.name.toLowerCase().includes(q)
+      );
+
+      grid.innerHTML = '';
+
+      filtered.slice(0, visibleCount).forEach(p => {
+        const price = (p.price_cents / 100).toFixed(2);
+
+        let actionBtn = '';
+        if (p.is_sold_out) {
+          actionBtn = `<button class="w-full py-2 rounded bg-red-600 text-white text-sm" disabled>Sold Out</button>`;
+        } else if (p.is_reserved) {
+          actionBtn = `<button class="w-full py-2 rounded bg-yellow-600 text-black text-sm" disabled>Reserved</button>`;
+        } else {
+          actionBtn = `<button onclick="buy(${p.id})" class="w-full py-2 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-sm">Buy</button>`;
+        }
+
+        const el = document.createElement('div');
+        el.className = "bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col";
+
+        el.innerHTML = `
+          <img src="${p.image || ''}" class="h-36 w-full object-cover bg-zinc-800">
+
+          <div class="p-3 flex flex-col flex-grow">
+            <h3 class="font-semibold text-sm leading-tight mb-1">${p.name}</h3>
+
+            <p class="text-xs text-zinc-400 mb-1">
+              Qty: ${p.quantity} • Reserved: ${p.reserved}
+            </p>
+
+            <p class="text-sm font-bold mb-3">$${price}</p>
+
+            <div class="mt-auto">
+              ${actionBtn}
+            </div>
+          </div>
+        `;
+
+        grid.appendChild(el);
+      });
+
+      document.getElementById('loadMoreBtn').style.display =
+        visibleCount < filtered.length ? 'block' : 'none';
+    }
+
+    function buy(id) {
+      fetch('/api/create-checkout-session/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collection_card_id: id, quantity: 1 })
+      })
+      .then(r => r.json())
+      .then(j => {
         if (j.url) window.location = j.url;
-        else alert('Error: ' + (j.error||'unknown'));
+        else alert(j.error || 'Checkout failed');
+      });
     }
+
+    document.getElementById('searchInput').addEventListener('input', () => {
+      visibleCount = 20;
+      render();
+    });
+
+    document.getElementById('loadMoreBtn').addEventListener('click', () => {
+      visibleCount += 20;
+      render();
+    });
+
     loadProducts();
-    </script>
+  </script>
+
 </body>
 </html>

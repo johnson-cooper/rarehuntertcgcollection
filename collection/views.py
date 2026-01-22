@@ -23,22 +23,31 @@ def api_products(request):
     out = []
 
     for c in qs:
-        # Get first image if exists
         img_url = ''
         if c.images.exists():
             img = c.images.first()
-            if img.img:  # this is ImageFieldFile
-                img_url = request.build_absolute_uri(img.img.url)  # convert to full URL
+            if img.img:
+                img_url = request.build_absolute_uri(img.img.url)
 
-        
         price = get_sell_price(c)
+        available = c.quantity - c.reserved
+
         out.append({
             'id': c.id,
             'name': c.card.name,
             'price_cents': int(price * 100),
             'currency': 'USD',
-            'available_qty': c.quantity,
-            'image': img_url  # must be string, not ImageFieldFile
+
+            # ✅ inventory truth
+            'quantity': c.quantity,
+            'reserved': c.reserved,
+            'available': available,
+
+            # ✅ convenience flags (frontend-friendly)
+            'is_sold_out': available <= 0,
+            'is_reserved': c.reserved > 0 and available > 0,
+
+            'image': img_url,
         })
 
     return JsonResponse(out, safe=False)
