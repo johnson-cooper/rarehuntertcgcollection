@@ -143,7 +143,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
 
                     if img_file_path and os.path.exists(img_file_path):
                         # Save image file
-                        upload_path = os.path.join(settings.MEDIA_ROOT, 'uploads', img_filename)
+                        upload_path = os.path.join(settings.MEDIA_ROOT, img_filename)
                         os.makedirs(os.path.dirname(upload_path), exist_ok=True)
 
                         with open(img_file_path, 'rb') as f:
@@ -151,7 +151,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
                                 dest.write(f.read())
 
                         # Save DB record only if not already linked
-                        db_img_path = os.path.join('uploads', img_filename)
+                        db_img_path = img_filename  # relative to MEDIA_ROOT
 
                         if not coll_card.images.filter(img=db_img_path).exists():
                             CollectionImage.objects.create(
