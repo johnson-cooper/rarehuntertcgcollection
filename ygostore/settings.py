@@ -11,8 +11,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(BASE_DIR / '.env') if os.path.exists('.env') else None
 DEBUG = env('DEBUG', default=True)
-ALLOWED_HOSTS = ['*'] if DEBUG else [env('ALLOWED_HOST', default='')]
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['rarehuntertcgcollection-production.up.railway.app'])
 SECRET_KEY = env('SECRET_KEY', default='changeme')
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://rarehuntertcgcollection-production.up.railway.app'
+]
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
