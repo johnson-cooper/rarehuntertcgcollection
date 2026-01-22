@@ -65,15 +65,29 @@ class ImportBatchAdmin(admin.ModelAdmin):
         incoming_ids = set()
         is_replace = batch.mode == 'replace'
 
+        # --- REPLACE MODE: delete ALL previous cards + images for this batch first ---
+        if is_replace:
+            old_cards = CollectionCard.objects.filter(import_batch=batch)
+            for cc in old_cards:
+                for img in cc.images.all():
+                    path = os.path.join(settings.MEDIA_ROOT, str(img.img))
+                    if os.path.exists(path):
+                        os.remove(path)
+                    img.delete()
+                cc.delete()
+            deleted = old_cards.count()
+
         for c in data['cards']:
             exported_id = c.get('id')
             incoming_ids.add(exported_id)
 
+            # --- Card ---
             card_obj, _ = Card.objects.get_or_create(
                 konami_id=c.get('konami_id'),
                 defaults={'name': c['name']}
             )
 
+            # --- CardSet ---
             set_data = c.get('set')
             card_set = None
             if set_data:
@@ -85,72 +99,64 @@ class ImportBatchAdmin(admin.ModelAdmin):
                     }
                 )
 
-            coll_card, created_flag = CollectionCard.objects.get_or_create(
+            # --- CollectionCard ---
+            coll_card = CollectionCard.objects.filter(
                 exported_id=exported_id,
-                import_batch=batch,
-                defaults={
-                    'card': card_obj,
-                    'card_set': card_set,
-                    'edition': c.get('edition', 'Unlimited'),
-                    'condition': c.get('condition'),
-                    'quantity': c.get('quantity', 1),
-                    'misprint': (
-                        c.get('misprint', {}).get('description')
+                import_batch=batch
+            ).first()
+
+            edition = c.get('edition', 'Unlimited')
+            condition = c.get('condition')
+            quantity = c.get('quantity', 1)
+            misprint = (c.get('misprint', {}).get('description')
                         if isinstance(c.get('misprint'), dict)
-                        else None
-                    ),
-                    'psa': c.get('psa'),
-                    'notes': c.get('notes'),
-                    'value_low': c.get('pricing', {}).get('low'),
-                    'value_mid': c.get('pricing', {}).get('mid'),
-                    'value_high': c.get('pricing', {}).get('high'),
-                    'effective_mid': c.get('pricing', {}).get('effective_mid'),
-                    'pricing_source': c.get('pricing', {}).get('source'),
-                }
-            )
+                        else None)
+            psa = c.get('psa')
+            notes = c.get('notes')
+            pricing = c.get('pricing', {})
+            low = pricing.get('low')
+            mid = pricing.get('mid')
+            high = pricing.get('high')
+            effective_mid = pricing.get('effective_mid') or mid
+            pricing_source = pricing.get('source')
 
-            if not created_flag:
-                if is_replace:
-                    # FULL overwrite
-                    coll_card.card = card_obj
-                    coll_card.card_set = card_set
-                    coll_card.edition = c.get('edition', coll_card.edition)
-                    coll_card.condition = c.get('condition')
-                    coll_card.quantity = c.get('quantity', coll_card.quantity)
-                    coll_card.misprint = (
-                        c.get('misprint', {}).get('description')
-                        if isinstance(c.get('misprint'), dict)
-                        else None
-                    )
-                    coll_card.notes = c.get('notes')
-                    coll_card.value_low = c.get('pricing', {}).get('low')
-                    coll_card.value_mid = c.get('pricing', {}).get('mid')
-                    coll_card.value_high = c.get('pricing', {}).get('high')
-                    coll_card.effective_mid = c.get('pricing', {}).get('effective_mid')
-                    coll_card.pricing_source = c.get('pricing', {}).get('source')
-
-                else:
-                    # MERGE: only fill missing fields
-                    if coll_card.card_set is None:
-                        coll_card.card_set = card_set
-                    if coll_card.condition is None:
-                        coll_card.condition = c.get('condition')
-                    if coll_card.quantity in (None, 0):
-                        coll_card.quantity = c.get('quantity', coll_card.quantity)
-                    if coll_card.misprint is None:
-                        coll_card.misprint = (
-                            c.get('misprint', {}).get('description')
-                            if isinstance(c.get('misprint'), dict)
-                            else None
-                        )
-                    if coll_card.notes is None:
-                        coll_card.notes = c.get('notes')
-                    if coll_card.value_mid is None:
-                        coll_card.value_mid = c.get('pricing', {}).get('mid')
-
+            if coll_card:
+                # update existing card
+                coll_card.card = card_obj
+                coll_card.card_set = card_set
+                coll_card.edition = edition
+                coll_card.condition = condition
+                coll_card.quantity = quantity
+                coll_card.misprint = misprint
+                coll_card.psa = psa
+                coll_card.notes = notes
+                coll_card.value_low = low
+                coll_card.value_mid = mid
+                coll_card.value_high = high
+                coll_card.effective_mid = effective_mid
+                coll_card.pricing_source = pricing_source
+                coll_card.import_batch = batch
                 coll_card.save()
                 updated += 1
             else:
+                # create new
+                CollectionCard.objects.create(
+                    card=card_obj,
+                    card_set=card_set,
+                    edition=edition,
+                    condition=condition,
+                    quantity=quantity,
+                    misprint=misprint,
+                    psa=psa,
+                    notes=notes,
+                    value_low=low,
+                    value_mid=mid,
+                    value_high=high,
+                    effective_mid=effective_mid,
+                    pricing_source=pricing_source,
+                    import_batch=batch,
+                    exported_id=exported_id
+                )
                 created += 1
 
             # --- Images ---
@@ -158,18 +164,15 @@ class ImportBatchAdmin(admin.ModelAdmin):
             if img_data and img_data.get('img'):
                 img_filename = os.path.basename(img_data['img'])
 
-                # MERGE: skip if image already exists
-                if not is_replace and coll_card.images.exists():
-                    continue
-
-                # REPLACE: delete old images
-                if is_replace:
+                # Delete existing images if replace
+                if is_replace and coll_card:
                     for old_img in coll_card.images.all():
-                        old_path = os.path.join(settings.MEDIA_ROOT, str(old_img.img))
-                        if os.path.exists(old_path):
-                            os.remove(old_path)
+                        path = os.path.join(settings.MEDIA_ROOT, str(old_img.img))
+                        if os.path.exists(path):
+                            os.remove(path)
                         old_img.delete()
 
+                # Add image
                 for root, _, files in os.walk(tmpdir):
                     if img_filename in files:
                         src = os.path.join(root, img_filename)
@@ -179,25 +182,12 @@ class ImportBatchAdmin(admin.ModelAdmin):
                             fdst.write(fsrc.read())
 
                         CollectionImage.objects.create(
-                            collection_card=coll_card,
+                            collection_card=coll_card or CollectionCard.objects.filter(
+                                exported_id=exported_id, import_batch=batch
+                            ).first(),
                             img=img_filename
                         )
                         break
-
-        # --- DELETE missing cards ONLY in replace ---
-        if is_replace:
-            to_delete = CollectionCard.objects.filter(
-                import_batch=batch
-            ).exclude(exported_id__in=incoming_ids)
-
-            for card in to_delete:
-                for img in card.images.all():
-                    path = os.path.join(settings.MEDIA_ROOT, str(img.img))
-                    if os.path.exists(path):
-                        os.remove(path)
-                    img.delete()
-                card.delete()
-                deleted += 1
 
         return created, updated, deleted
 
