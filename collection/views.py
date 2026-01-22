@@ -155,6 +155,7 @@ def create_checkout_session(request):
                     'quantity': qty
                 }],
                 mode='payment',
+                shipping_address_collection={"allowed_countries": ["US"],},
                 success_url=f"{settings.BASE_URL}/success/",
                 cancel_url=f"{settings.BASE_URL}/cancel/",
                 expires_at=expires_at,  # <-- set expiration
