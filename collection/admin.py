@@ -61,11 +61,16 @@ class ImportBatchAdmin(admin.ModelAdmin):
             raise
 
     def import_zip_data(self, batch, data, tmpdir):
+        """
+        Import cards + images from JSON ZIP into a given ImportBatch.
+        Handles 'merge' and 'replace' modes.
+        Images are saved to MEDIA_ROOT and attached to CollectionCard.
+        """
         created = updated = deleted = 0
         incoming_ids = set()
         is_replace = batch.mode == 'replace'
 
-        # --- REPLACE MODE: delete ALL previous cards + images for this batch first ---
+        # --- REPLACE MODE: delete all old cards + images for this batch first ---
         if is_replace:
             old_cards = CollectionCard.objects.filter(import_batch=batch)
             for cc in old_cards:
@@ -77,7 +82,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
                 cc.delete()
             deleted = old_cards.count()
 
-        for c in data['cards']:
+        for c in data.get('cards', []):
             exported_id = c.get('id')
             incoming_ids.add(exported_id)
 
@@ -110,7 +115,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
             quantity = c.get('quantity', 1)
             misprint = (c.get('misprint', {}).get('description')
                         if isinstance(c.get('misprint'), dict)
-                        else None)
+                        else c.get('misprint'))
             psa = c.get('psa')
             notes = c.get('notes')
             pricing = c.get('pricing', {})
@@ -120,27 +125,42 @@ class ImportBatchAdmin(admin.ModelAdmin):
             effective_mid = pricing.get('effective_mid') or mid
             pricing_source = pricing.get('source')
 
-            if coll_card:
-                # update existing card
-                coll_card.card = card_obj
-                coll_card.card_set = card_set
-                coll_card.edition = edition
-                coll_card.condition = condition
-                coll_card.quantity = quantity
-                coll_card.misprint = misprint
-                coll_card.psa = psa
-                coll_card.notes = notes
-                coll_card.value_low = low
-                coll_card.value_mid = mid
-                coll_card.value_high = high
-                coll_card.effective_mid = effective_mid
-                coll_card.pricing_source = pricing_source
+            if coll_card and not is_replace:
+                # --- MERGE mode: only fill missing data ---
+                if coll_card.card_set is None:
+                    coll_card.card_set = card_set
+                if not coll_card.condition:
+                    coll_card.condition = condition
+                if coll_card.quantity in (None, 0):
+                    coll_card.quantity = quantity
+                if not coll_card.misprint:
+                    coll_card.misprint = misprint
+                if not coll_card.psa:
+                    coll_card.psa = psa
+                if not coll_card.notes:
+                    coll_card.notes = notes
+                if coll_card.value_mid is None:
+                    coll_card.value_low = low
+                    coll_card.value_mid = mid
+                    coll_card.value_high = high
+                    coll_card.effective_mid = effective_mid
+                    coll_card.pricing_source = pricing_source
+
                 coll_card.import_batch = batch
                 coll_card.save()
                 updated += 1
+
             else:
-                # create new
-                CollectionCard.objects.create(
+                # --- REPLACE or new: delete old if exists ---
+                if coll_card:
+                    for img in coll_card.images.all():
+                        path = os.path.join(settings.MEDIA_ROOT, str(img.img))
+                        if os.path.exists(path):
+                            os.remove(path)
+                        img.delete()
+                    coll_card.delete()
+
+                coll_card = CollectionCard.objects.create(
                     card=card_obj,
                     card_set=card_set,
                     edition=edition,
@@ -164,15 +184,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
             if img_data and img_data.get('img'):
                 img_filename = os.path.basename(img_data['img'])
 
-                # Delete existing images if replace
-                if is_replace and coll_card:
-                    for old_img in coll_card.images.all():
-                        path = os.path.join(settings.MEDIA_ROOT, str(old_img.img))
-                        if os.path.exists(path):
-                            os.remove(path)
-                        old_img.delete()
-
-                # Add image
+                # Copy image from tmpdir to MEDIA_ROOT
                 for root, _, files in os.walk(tmpdir):
                     if img_filename in files:
                         src = os.path.join(root, img_filename)
@@ -181,15 +193,29 @@ class ImportBatchAdmin(admin.ModelAdmin):
                         with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
                             fdst.write(fsrc.read())
 
+                        # Always attach to the current CollectionCard
                         CollectionImage.objects.create(
-                            collection_card=coll_card or CollectionCard.objects.filter(
-                                exported_id=exported_id, import_batch=batch
-                            ).first(),
+                            collection_card=coll_card,
                             img=img_filename
                         )
                         break
 
+        # --- DELETE missing cards ONLY in replace mode ---
+        if is_replace:
+            to_delete = CollectionCard.objects.filter(import_batch=batch).exclude(
+                exported_id__in=incoming_ids
+            )
+            for card in to_delete:
+                for img in card.images.all():
+                    path = os.path.join(settings.MEDIA_ROOT, str(img.img))
+                    if os.path.exists(path):
+                        os.remove(path)
+                    img.delete()
+                card.delete()
+                deleted += 1
+
         return created, updated, deleted
+
 
 
 @admin.register(Card)
