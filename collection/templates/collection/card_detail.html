@@ -122,6 +122,33 @@
     });
   });
 
+async function refreshCardStatus(cardId) {
+  try {
+    // fetch the latest product info from your API
+    const res = await fetch(`/api/card/${cardId}/`, { credentials: 'same-origin' });
+    if (!res.ok) return;
+    const product = await res.json();
+
+    const actionDiv = document.querySelector('#buyBtn')?.parentElement;
+    if (!actionDiv) return;
+
+    // determine the current status
+    const status = product.is_sold_out ? 'soldout' : 'available';
+
+    // update button dynamically
+    actionDiv.innerHTML = status === 'soldout'
+      ? `<div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">Sold out</div>`
+      : `<button id="buyBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md text-white">Buy now</button>`;
+
+    // reattach click listener if available
+    const buyBtn = document.querySelector('#buyBtn');
+    if (buyBtn) buyBtn.addEventListener('click', () => buy(cardId));
+
+  } catch (e) {
+    console.error('Failed to refresh card status:', e);
+  }
+}
+
   async function buy(id) {
     try {
       const res = await fetch('/api/create-checkout-session/', {
@@ -140,6 +167,7 @@
       alert('Checkout error: ' + (e.message || e));
     }
   }
+setInterval(() => refreshCardStatus({{ product.id }}), 10000);
 </script>
 
 </body>

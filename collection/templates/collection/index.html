@@ -188,6 +188,40 @@ async function buyItem(id){
   }catch(e){ alert('Checkout error: '+e.message); }
 }
 
+async function refreshStatuses() {
+  try {
+    const res = await fetch(API_LIST, {credentials: 'same-origin'});
+    const latestProducts = await res.json();
+
+    latestProducts.forEach(p => {
+      const card = document.querySelector(`.buy-btn[data-id="${p.id}"]`)?.closest('article');
+      if (!card) return; // card not in DOM yet
+
+      const actionDiv = card.querySelector('div.mt-auto');
+      if (!actionDiv) return;
+
+      const quantity = typeof p.quantity==='number'?p.quantity:(typeof p.available==='number'?p.available:null);
+      const reserved = Number(p.reserved||0);
+      const available = typeof p.available==='number'?p.available:Math.max(0,(quantity||0)-reserved);
+      const status = p.is_sold_out?'soldout':p.is_reserved?'reserved':'available';
+
+      // update button or label dynamically
+      actionDiv.innerHTML = status==='soldout'
+        ? `<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`
+        : status==='reserved'
+        ? `<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`
+        : `<button class="buy-btn w-full px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-500 font-semibold" data-id="${p.id}">Request to buy</button>`;
+
+      // reattach event listener if button exists
+      const buyBtn = actionDiv.querySelector('.buy-btn');
+      if (buyBtn) buyBtn.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); buyItem(p.id); });
+    });
+  } catch(e) {
+    console.error("Failed to refresh statuses:", e);
+  }
+}
+
+
 // EVENTS
 el('search').addEventListener('input',debounce(()=>{visibleCount=24;render();},300));
 el('setFilter').addEventListener('change',()=>{visibleCount=24;render();});
@@ -196,11 +230,13 @@ el('loadMore').addEventListener('click',()=>{visibleCount+=24;render();});
 el('refreshBtn').addEventListener('click',()=>loadProducts());
 window.addEventListener('keydown',e=>{if(e.key==='Escape'){/* no modal */}});
 
+
 // debounce util
 function debounce(fn,wait=250){let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),wait);};}
 
 // INIT
 loadProducts();
+setInterval(refreshStatuses, 3000);
 </script>
 </body>
 </html>
