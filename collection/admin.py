@@ -8,7 +8,7 @@ from .models import Card, CardSet, CollectionCard, ImportBatch, CollectionImage
 
 class ImportBatchForm(forms.ModelForm):
     upload_zip = forms.FileField(
-        required=False,
+        required=False, 
         help_text='Upload a ZIP containing JSON + images'
     )
 
@@ -52,8 +52,8 @@ class ImportBatchAdmin(admin.ModelAdmin):
                     created, updated, deleted = self.import_zip_data(obj, data, tmpdir)
 
                 self.message_user(
-                    request,
-                    f'Import complete: {created} created, {updated} updated, {deleted} deleted',
+                    request, 
+                    f'Import complete: {created} created, {updated} updated, {deleted} deleted', 
                     level=messages.SUCCESS
                 )
         except Exception as e:
@@ -61,130 +61,133 @@ class ImportBatchAdmin(admin.ModelAdmin):
             raise
 
     def import_zip_data(self, batch, data, tmpdir):
-        """
-        FULL TABLE REPLACE implementation:
-        - Delete all CollectionImage files + rows
-        - Delete all CollectionCard rows
-        - Recreate CollectionCard rows from JSON
-        - Save images found in the ZIP into Django storage and link them to created rows
-        """
-        created = 0
-        updated = 0  # not used for replace, kept for API parity
-        deleted = 0
+        created = updated = deleted = 0
+        incoming_ids = set()
+        is_replace = batch.mode == 'replace'
 
-        cards = data.get('cards') or []
+        # --- REPLACE MODE: delete ALL previous cards + images for this batch first ---
+        if is_replace:
+            old_cards = CollectionCard.objects.filter(import_batch=batch)
+            for cc in old_cards:
+                for img in cc.images.all():
+                    path = os.path.join(settings.MEDIA_ROOT, str(img.img))
+                    if os.path.exists(path):
+                        os.remove(path)
+                    img.delete()
+                cc.delete()
+            deleted = old_cards.count()
 
-        # 1) Delete existing images from disk and DB
-        # iterate over all images to be sure we remove files
-        all_images = CollectionImage.objects.all()
-        for img in all_images:
-            try:
-                file_path = os.path.join(settings.MEDIA_ROOT, str(img.img))
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            except Exception:
-                # continue even if file removal fails
-                pass
-            # delete the model instance
-            img.delete()
+        for c in data['cards']:
+            exported_id = c.get('id')
+            incoming_ids.add(exported_id)
 
-        # 2) Delete all collection cards
-        deleted = CollectionCard.objects.count()
-        CollectionCard.objects.all().delete()
+            # --- Card ---
+            card_obj, _ = Card.objects.get_or_create(
+                konami_id=c.get('konami_id'),
+                defaults={'name': c['name']}
+            )
 
-        # 3) Recreate from JSON
-        for c in cards:
-            # Card
-            konami = c.get('konami_id')
-            name = c.get('name') or ''
-            card_obj = None
-            if konami:
-                card_obj = Card.objects.filter(konami_id=konami).first()
-            if not card_obj:
-                card_obj = Card.objects.filter(name__iexact=name).first()
-            if not card_obj:
-                card_obj = Card.objects.create(name=name, konami_id=konami)
-
-            # CardSet
-            set_data = c.get('set') or {}
+            # --- CardSet ---
+            set_data = c.get('set')
             card_set = None
             if set_data:
-                code = set_data.get('code')
-                set_name = set_data.get('name')
-                if code:
-                    card_set = CardSet.objects.filter(code__iexact=code).first()
-                if not card_set and set_name:
-                    card_set = CardSet.objects.filter(name__iexact=set_name).first()
-                if not card_set:
-                    # parse release_date if present
-                    release_date = set_data.get('release_date', None)
-                    card_set = CardSet.objects.create(
-                        name=set_name or '',
-                        code=code or None,
-                        release_date=release_date or None
-                    )
+                card_set, _ = CardSet.objects.get_or_create(
+                    code=set_data.get('code'),
+                    defaults={
+                        'name': set_data.get('name'),
+                        'release_date': set_data.get('release_date')
+                    }
+                )
 
-            # CollectionCard fields
+            # --- CollectionCard ---
+            coll_card = CollectionCard.objects.filter(
+                exported_id=exported_id,
+                import_batch=batch
+            ).first()
+
             edition = c.get('edition', 'Unlimited')
-            condition = c.get('condition') or ''
-            quantity = c.get('quantity') or 1
-            misprint_val = None
-            misprint = c.get('misprint')
-            if isinstance(misprint, dict):
-                misprint_val = misprint.get('description') or None
-            else:
-                misprint_val = misprint or None
-            psa = c.get('psa') or None
-            notes = c.get('notes') or None
-
-            pricing = c.get('pricing') or {}
+            condition = c.get('condition')
+            quantity = c.get('quantity', 1)
+            misprint = (c.get('misprint', {}).get('description')
+                        if isinstance(c.get('misprint'), dict)
+                        else None)
+            psa = c.get('psa')
+            notes = c.get('notes')
+            pricing = c.get('pricing', {})
             low = pricing.get('low')
             mid = pricing.get('mid')
             high = pricing.get('high')
-            effective_mid = pricing.get('effective_mid')
+            effective_mid = pricing.get('effective_mid') or mid
             pricing_source = pricing.get('source')
 
-            exported_id = c.get('id')
+            if coll_card:
+                # update existing card
+                coll_card.card = card_obj
+                coll_card.card_set = card_set
+                coll_card.edition = edition
+                coll_card.condition = condition
+                coll_card.quantity = quantity
+                coll_card.misprint = misprint
+                coll_card.psa = psa
+                coll_card.notes = notes
+                coll_card.value_low = low
+                coll_card.value_mid = mid
+                coll_card.value_high = high
+                coll_card.effective_mid = effective_mid
+                coll_card.pricing_source = pricing_source
+                coll_card.import_batch = batch
+                coll_card.save()
+                updated += 1
+            else:
+                # create new
+                CollectionCard.objects.create(
+                    card=card_obj,
+                    card_set=card_set,
+                    edition=edition,
+                    condition=condition,
+                    quantity=quantity,
+                    misprint=misprint,
+                    psa=psa,
+                    notes=notes,
+                    value_low=low,
+                    value_mid=mid,
+                    value_high=high,
+                    effective_mid=effective_mid,
+                    pricing_source=pricing_source,
+                    import_batch=batch,
+                    exported_id=exported_id
+                )
+                created += 1
 
-            # create collection card
-            cc = CollectionCard.objects.create(
-                card=card_obj,
-                card_set=card_set,
-                edition=edition,
-                condition=condition,
-                quantity=quantity,
-                misprint=misprint_val,
-                psa=psa,
-                notes=notes,
-                value_low=low,
-                value_mid=mid,
-                value_high=high,
-                effective_mid=effective_mid,
-                pricing_source=pricing_source,
-                import_batch=batch,
-                exported_id=exported_id
-            )
-            created += 1
+            # --- Images ---
+            img_data = c.get('images', {})
+            if img_data and img_data.get('img'):
+                img_filename = os.path.basename(img_data['img'])
 
-            # Images: try to find matching file inside tmpdir (by basename)
-            img_data = c.get('images') or {}
-            img_path = img_data.get('img') if isinstance(img_data, dict) else None
-            if img_path:
-                filename = os.path.basename(img_path)
-                found = None
+                # Delete existing images if replace
+                if is_replace and coll_card:
+                    for old_img in coll_card.images.all():
+                        path = os.path.join(settings.MEDIA_ROOT, str(old_img.img))
+                        if os.path.exists(path):
+                            os.remove(path)
+                        old_img.delete()
+
+                # Add image
                 for root, _, files in os.walk(tmpdir):
-                    if filename in files:
-                        found = os.path.join(root, filename)
+                    if img_filename in files:
+                        src = os.path.join(root, img_filename)
+                        dst = os.path.join(settings.MEDIA_ROOT, img_filename)
+                        os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
+                        with open(src, 'rb') as fsrc, open(dst, 'wb') as fdst:
+                            fdst.write(fsrc.read())
+
+                        CollectionImage.objects.create(
+                            collection_card=coll_card or CollectionCard.objects.filter(
+                                exported_id=exported_id, import_batch=batch
+                            ).first(),
+                            img=img_filename
+                        )
                         break
-                if found:
-                    # save via Django storage so upload_to settings are honored
-                    try:
-                        with open(found, 'rb') as f:
-                            django_file = File(f, name=filename)
-                            CollectionImage.objects.create(collection_card=cc, img=django_file)
-                    except Exception as e:
-                        # continue on image save errors
-                        pass
 
         return created, updated, deleted
 
