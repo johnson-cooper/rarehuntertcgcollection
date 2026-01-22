@@ -67,13 +67,14 @@ class CollectionCard(models.Model):
     def available(self):
         return self.quantity - self.reserved
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["exported_id", "import_batch"],
-                name="uq_exported_card_per_batch"
-            )
-        ]
+class Meta:
+    constraints = [
+        models.UniqueConstraint(
+            fields=["exported_id"],
+            condition=models.Q(exported_id__isnull=False),
+            name="uq_exported_card_global"
+        )
+    ]
 
     def __str__(self):
         return f"{self.card.name} ({self.card_set}) - {self.edition}"
