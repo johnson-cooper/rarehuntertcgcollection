@@ -110,6 +110,9 @@ def run_import_batch(import_batch: ImportBatch, json_data: dict):
     meta = json_data.get('meta') or {}
     cards = json_data.get('cards') or []
 
+    if import_batch.mode == 'replace':
+        CollectionCard.objects.all().delete()
+
     exported_at = meta.get('exported_at')
     if exported_at:
         try:
