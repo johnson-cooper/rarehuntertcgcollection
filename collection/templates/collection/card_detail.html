@@ -104,7 +104,8 @@
     onclick="addToCart({{ product.id }})">
     Add to cart
   </button>
-  <span id="cartCount" class="ml-2 font-bold">0</span>
+  <a href="/cart/" class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-500">View Cart</a>
+  <span id="cartCount" class="ml-2 font-bold"></span>
 </div>
           {% endif %}
         </div>
@@ -137,7 +138,6 @@
       <a href="/terms" class="hover:text-indigo-500 transition">Terms</a>
       <a href="/privacy" class="hover:text-indigo-500 transition">Privacy</a>
       <a href="https://instagram.com/rarehunter.tcg" target="_blank" class="hover:text-indigo-500 transition">Instagram</a>
-      <a href="/cart/" class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-500">View Cart</a>
     </div>
   </div>
 </footer>
