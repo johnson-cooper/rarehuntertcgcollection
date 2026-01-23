@@ -86,6 +86,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_ROOT = Path("/app/uploads")
 MEDIA_URL = '/media/'
 
+CSRF_COOKIE_HTTPONLY = False  # allows JS to read the cookie
+CSRF_COOKIE_SAMESITE = 'Lax'  # or 'None' if cross-site requests
+CSRF_COOKIE_SECURE = True      # if using HTTPS
+
 # Stripe configuration
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
