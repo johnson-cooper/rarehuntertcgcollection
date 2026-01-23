@@ -48,10 +48,26 @@ def add_to_cart(request):
     qty = int(data.get("quantity", 1))
 
     cart = get_cart(request)
-    cart[card_id] = cart.get(card_id, 0) + qty
-    save_cart(request)
 
-    return JsonResponse({"cart": cart})
+    # fetch card
+    try:
+        c = CollectionCard.objects.get(id=card_id)
+    except CollectionCard.DoesNotExist:
+        return JsonResponse({"error": "Card not found"}, status=404)
+
+    available = c.quantity - c.reserved
+    if available <= 0:
+        # remove from cart if sold out
+        cart.pop(card_id, None)
+        save_cart(request)
+        return JsonResponse({"error": "Item sold out", "cart": cart, "cart_count": sum(cart.values())}, status=400)
+
+    # cap qty to available
+    new_qty = min(qty + cart.get(card_id, 0), available)
+    cart[card_id] = new_qty
+
+    save_cart(request)
+    return JsonResponse({"cart": cart, "cart_count": sum(cart.values())})
 
 @require_POST
 def remove_from_cart(request):
@@ -59,10 +75,12 @@ def remove_from_cart(request):
     card_id = str(data["collection_card_id"])
 
     cart = get_cart(request)
-    cart.pop(card_id, None)
-    save_cart(request)
+    if card_id in cart:
+        cart.pop(card_id)
+        save_cart(request)
 
-    return JsonResponse({"cart": cart})
+    return JsonResponse({"cart": cart, "cart_count": sum(cart.values())})
+
 
 
 

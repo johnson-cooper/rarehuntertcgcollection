@@ -105,7 +105,7 @@
     Add to cart
   </button>
   <a href="/cart/" class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-500">View Cart</a>
-  <span id="cartCount" class="ml-2 font-bold"></span>
+  <div id="cartFeedback" class="fixed top-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded shadow-lg opacity-0 transition-opacity duration-300 z-50"></div>
 </div>
           {% endif %}
         </div>
@@ -167,9 +167,7 @@
 
 async function refreshCardStatus(cardId) {
   try {
-    const res = await fetch(`/api/card-status/${cardId}/`, {
-      credentials: 'same-origin'
-    });
+    const res = await fetch(`/api/card-status/${cardId}/`, { credentials: 'same-origin' });
     if (!res.ok) return;
 
     const product = await res.json();
@@ -178,6 +176,10 @@ async function refreshCardStatus(cardId) {
     if (!actionDiv) return;
 
     if (product.is_sold_out) {
+      // Remove item from cart badge
+      document.getElementById('cartCount').textContent = 0;
+
+      // Update UI
       actionDiv.innerHTML =
         `<div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">
           Sold out
@@ -236,21 +238,45 @@ async function requestToBuy(id) {
 
 <script>
 async function addToCart(collectionCardId) {
-  const res = await fetch('/cart/add/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': CSRF
-    },
-    body: JSON.stringify({ collection_card_id: collectionCardId, quantity: 1 })
-  });
+  try {
+    const res = await fetch('/cart/add/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF
+      },
+      body: JSON.stringify({ collection_card_id: collectionCardId, quantity: 1 })
+    });
 
-  const data = await res.json();
-  if (res.ok) {
-    document.getElementById('cartCount').textContent = data.cart_count;
-  } else {
-    alert(data.error || 'Failed to add to cart');
+    const data = await res.json();
+
+    // Update cart count badge
+    if (data.cart_count !== undefined) {
+      document.getElementById('cartCount').textContent = data.cart_count;
+    }
+
+    // Show feedback
+    if (res.ok) {
+      showFeedback("Added to cart!");
+    } else {
+      showFeedback(data.error || "Cannot add item", true);
+    }
+
+  } catch (e) {
+    showFeedback("Error adding to cart", true);
+    console.error(e);
   }
+}
+function showFeedback(message, isError = false) {
+  const el = document.getElementById('cartFeedback');
+  el.textContent = message;
+  el.classList.remove('opacity-0', 'bg-red-600', 'bg-indigo-600');
+  el.classList.add(isError ? 'bg-red-600' : 'bg-indigo-600', 'opacity-100');
+
+  setTimeout(() => {
+    el.classList.remove('opacity-100');
+    el.classList.add('opacity-0');
+  }, 2000); // hide after 2s
 }
 </script>
 
