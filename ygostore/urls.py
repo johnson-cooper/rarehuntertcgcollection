@@ -14,6 +14,7 @@ urlpatterns = [
     path("cart/add/", coll_views.add_to_cart),
     path("cart/remove/", coll_views.remove_from_cart),
     path("checkout/cart/", coll_views.create_cart_checkout_session),
+    path('cart/status/', coll_views.cart_status, name='cart_status'),
      # Static pages
     path('about/', coll_views.about, name='about'),
     path('terms/', coll_views.terms, name='terms'),
