@@ -13,7 +13,7 @@ urlpatterns = [
     path('api/card-status/<int:card_id>/', api_views.card_status),
     path("cart/add/", coll_views.add_to_cart),
     path("cart/remove/", coll_views.remove_from_cart),
-    path("checkout/cart/", coll_views.create_cart_checkout_session),
+    path("cart/checkout/", coll_views.create_cart_checkout_session),
     path('cart/status/', coll_views.cart_status, name='cart_status'),
      # Static pages
     path('about/', coll_views.about, name='about'),
