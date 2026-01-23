@@ -4,7 +4,70 @@ import json, zipfile, os, tempfile
 from django.db import transaction
 from django.core.files import File
 from django.conf import settings
-from .models import Card, CardSet, CollectionCard, ImportBatch, CollectionImage
+from .models import Card, CardSet, CollectionCard, ImportBatch, CollectionImage, Order
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+SMTP_SERVER = "mail.smtp2go.com"
+SMTP_PORT = 2525  # could also be 587, 8025, or 25
+SMTP_USERNAME = settings.SMTP2GO_USERNAME
+SMTP_PASSWORD = settings.SMTP2GO_PASSWORD
+FROM_EMAIL = "orders@rarehuntertcg.com"
+
+@admin.register(Order)
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ('stripe_order_id','email','status','tracking_number','created_at')
+    readonly_fields = ('stripe_order_id','email','items','shipping_name','shipping_address')
+    actions = ['send_tracking_email']
+
+    def send_tracking_email(self, request, queryset):
+        for order in queryset:
+            if order.tracking_number and order.status != 'shipped':
+                # --- build email ---
+                msg = MIMEMultipart('mixed')
+                msg['Subject'] = f"Your Rare Hunter TCG Order #{order.stripe_order_id} Has Shipped!"
+                msg['From'] = FROM_EMAIL
+                msg['To'] = order.email
+
+                # plain text
+                text = f"""
+Hi {order.email},
+
+Your Rare Hunter TCG order #{order.stripe_order_id} has shipped.
+Tracking Number: {order.tracking_number}
+
+Thank you for shopping with us!
+"""
+                # optional HTML version
+                html = f"""
+<html>
+  <body>
+    <p>Hi {order.email},</p>
+    <p>Your Rare Hunter TCG order <strong>#{order.stripe_order_id}</strong> has shipped.</p>
+    <p>Tracking Number: <strong>{order.tracking_number}</strong></p>
+    <p>Thank you for shopping with us!</p>
+  </body>
+</html>
+"""
+                msg.attach(MIMEText(text, 'plain'))
+                msg.attach(MIMEText(html, 'html'))
+
+                # --- send via SMTP2GO ---
+                try:
+                    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+                        smtp.ehlo()
+                        smtp.starttls()
+                        smtp.ehlo()
+                        smtp.login(SMTP_USERNAME, SMTP_PASSWORD)
+                        smtp.sendmail(FROM_EMAIL, [order.email], msg.as_string())
+                    order.status = 'shipped'
+                    order.save()
+                    self.message_user(request, f"Sent tracking email to {order.email}")
+                except Exception as e:
+                    self.message_user(request, f"Failed to send to {order.email}: {e}", level='error')
+
+    send_tracking_email.short_description = "Send tracking emails for selected orders"
 
 class ImportBatchForm(forms.ModelForm):
     upload_zip = forms.FileField(

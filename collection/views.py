@@ -3,7 +3,7 @@ from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
-from .models import CollectionCard
+from .models import CollectionCard, Order
 import stripe
 import time
 from django.db import transaction
@@ -219,11 +219,26 @@ def stripe_webhook(request):
         reserved_qty = int(sess['metadata']['reserved_qty'])
 
         with transaction.atomic():
+            # --- finalize stock ---
             c = CollectionCard.objects.select_for_update().get(id=card_id)
-            c.quantity -= reserved_qty  # finalize stock
+            c.quantity -= reserved_qty
             c.reserved -= reserved_qty
             c.save()
             print(f"Payment completed: {reserved_qty} of {c.card.name} sold.")
+
+            # --- create order ---
+            items = stripe.checkout.Session.list_line_items(sess['id'], limit=100)
+            shipping = sess.get('shipping') or {}
+            customer_email = sess.get('customer_details', {}).get('email', '')
+
+            Order.objects.create(
+                stripe_order_id=sess['id'],
+                email=customer_email,
+                shipping_name=shipping.get('name', ''),
+                shipping_address=shipping.get('address', {}),
+                status='paid',
+                items=[{'description': li.description, 'quantity': li.quantity} for li in items.data]
+            )
 
     elif event.get('type') in ['checkout.session.expired', 'payment_intent.payment_failed']:
         sess = event['data']['object']

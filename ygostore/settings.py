@@ -90,3 +90,5 @@ MEDIA_URL = '/media/'
 STRIPE_SECRET_KEY = env('STRIPE_SECRET_KEY', default='')
 STRIPE_WEBHOOK_SECRET = env('STRIPE_WEBHOOK_SECRET', default='')
 BASE_URL = env('BASE_URL', default='https://collection.rarehuntertcg.com')
+SMTP2GO_USERNAME = env('SMTP2GO_USERNAME', default='')
+SMTP2GO_PASSWORD = env('SMTP2GO_PASSWORD', default='')
