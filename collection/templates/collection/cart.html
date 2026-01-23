@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Shopping Cart – Rare Hunter TCG</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -16,7 +17,7 @@
   {% if items %}
   <div class="mt-6 space-y-4">
     {% for item in items %}
-    <div class="flex items-center justify-between bg-zinc-900 rounded-lg p-4">
+    <div class="cart-item flex items-center justify-between bg-zinc-900 rounded-lg p-4" data-id="{{ item.collection_card.id }}">
       <div class="flex items-center gap-4">
         {% if item.collection_card.images.exists %}
           <img src="{{ item.collection_card.images.first.img.url }}" alt="{{ item.collection_card.card.name }}" class="w-20 h-28 object-cover rounded" />
@@ -80,16 +81,16 @@
 </script>
 
 <script>
-document.addEventListener('click', e => {
-  const target = e.target;
+  // CSRF from meta
+  const CSRF = (() => {
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : null;
+  })();
 
-  if (target.matches('.qty-minus')) updateCart(target.dataset.id, -1);
-  if (target.matches('.qty-plus')) updateCart(target.dataset.id, 1);
-  if (target.matches('.remove-item')) removeFromCart(target.dataset.id);
-});
+  // feedback toast
   const cartFeedback = document.getElementById('cartFeedback');
-
   function showFeedback(message, isError=false) {
+    if (!cartFeedback) return;
     cartFeedback.textContent = message;
     cartFeedback.classList.remove('opacity-0', 'bg-red-600', 'bg-indigo-600');
     cartFeedback.classList.add(isError ? 'bg-red-600' : 'bg-indigo-600', 'opacity-100');
@@ -99,103 +100,115 @@ document.addEventListener('click', e => {
     }, 2000);
   }
 
- async function updateCart(collectionCardId, change) {
-  try {
-    const qtyEl = document.getElementById(`qty-${collectionCardId}`);
-    let currentQty = parseInt(qtyEl.textContent);
+  // event delegation for + / - / remove
+  document.addEventListener('click', e => {
+    const t = e.target;
+    if (t.matches('.qty-minus')) updateCart(t.dataset.id, -1);
+    if (t.matches('.qty-plus')) updateCart(t.dataset.id, 1);
+    if (t.matches('.remove-item')) removeFromCart(t.dataset.id);
+  });
 
-    if (currentQty + change < 0) return;
+  async function updateCart(collectionCardId, change) {
+    try {
+      const qtyEl = document.getElementById(`qty-${collectionCardId}`);
+      if (!qtyEl) return;
+      let currentQty = parseInt(qtyEl.textContent) || 0;
+      if (currentQty + change < 0) return;
 
-    const res = await fetch('/cart/add/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-      credentials: 'same-origin',
-      body: JSON.stringify({ collection_card_id: collectionCardId, quantity: change })
-    });
-    const data = await res.json();
+      const res = await fetch('/cart/add/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF
+        },
+        body: JSON.stringify({ collection_card_id: collectionCardId, quantity: change })
+      });
 
-    if (res.ok) {
-      if (!data.cart[collectionCardId] || data.cart[collectionCardId] <= 0) {
-        document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
-        showFeedback("Item removed (sold out or reserved)", true);
+      const data = await res.json();
+
+      if (res.ok) {
+        const newQty = data.cart && data.cart[String(collectionCardId)];
+        if (!newQty || newQty <= 0) {
+          document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
+          showFeedback("Item removed (sold out or reserved)", true);
+        } else {
+          qtyEl.textContent = newQty;
+          showFeedback("Cart updated!");
+        }
+        const cartCountEl = document.getElementById('cartCount');
+        if (cartCountEl && data.cart_count !== undefined) cartCountEl.textContent = data.cart_count;
+        refreshTotals();
       } else {
-        qtyEl.textContent = data.cart[collectionCardId];
-        showFeedback("Cart updated!");
+        showFeedback(data.error || "Cannot update item", true);
       }
-
-      document.getElementById('cartCount')?.textContent = data.cart_count;
-      refreshTotals();
-    } else {
-      showFeedback(data.error || "Cannot update item", true);
+    } catch (err) {
+      console.error(err);
+      showFeedback("Error updating cart", true);
     }
-  } catch (e) {
-    showFeedback("Error updating cart", true);
-    console.error(e);
   }
-}
 
   async function removeFromCart(collectionCardId) {
-  try {
-    const res = await fetch('/cart/remove/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-      credentials: 'same-origin',
-      body: JSON.stringify({ collection_card_id: collectionCardId })
-    });
-    const data = await res.json();
+    try {
+      const res = await fetch('/cart/remove/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF
+        },
+        body: JSON.stringify({ collection_card_id: collectionCardId })
+      });
+      const data = await res.json();
 
-    if (res.ok) {
-      document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
-      showFeedback("Removed from cart");
-      document.getElementById('cartCount')?.textContent = data.cart_count;
-      refreshTotals();
-    } else {
-      showFeedback(data.error || "Failed to remove item", true);
+      if (res.ok) {
+        document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
+        showFeedback("Removed from cart");
+        const cartCountEl = document.getElementById('cartCount');
+        if (cartCountEl && data.cart_count !== undefined) cartCountEl.textContent = data.cart_count;
+        refreshTotals();
+      } else {
+        showFeedback(data.error || "Failed to remove item", true);
+      }
+    } catch (err) {
+      console.error(err);
+      showFeedback("Error removing item", true);
     }
-  } catch (e) {
-    showFeedback("Error removing item", true);
-    console.error(e);
   }
-}
 
   async function refreshTotals() {
     try {
       const res = await fetch('/cart/status/', { credentials: 'same-origin' });
       if (!res.ok) return;
       const data = await res.json();
-      // update total
-      document.querySelector('.text-xl.font-bold')?.textContent = `Total: $${data.total.toFixed(2)}`;
-    } catch(e) {
+      const totalEl = document.querySelector('.text-xl.font-bold');
+      if (totalEl && data.total !== undefined) totalEl.textContent = `Total: $${data.total.toFixed(2)}`;
+    } catch (e) {
       console.error('Failed to refresh totals', e);
     }
   }
 
-  // Auto-refresh cart items for sold-out or reserved products every 5s
+  // polling to keep cart in sync
   setInterval(async () => {
     try {
       const res = await fetch('/cart/status/', { credentials: 'same-origin' });
       if (!res.ok) return;
       const data = await res.json();
-
-      for (const [cardId, qty] of Object.entries(data.cart)) {
+      for (const [cardId, qty] of Object.entries(data.cart || {})) {
         const qtyEl = document.getElementById(`qty-${cardId}`);
         if (!qtyEl) continue;
-
         if (qty <= 0) {
-          qtyEl.closest('.flex.items-center').parentElement.parentElement.remove();
+          document.querySelector(`.cart-item[data-id='${cardId}']`)?.remove();
           showFeedback("Item removed (sold out/reserved)", true);
         } else {
           qtyEl.textContent = qty;
         }
       }
-      // refresh total
       refreshTotals();
-    } catch(e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   }, 5000);
-
 </script>
+
 
 </body>
 </html>
