@@ -79,8 +79,8 @@ def cart_view(request):
     )
 
     for cc in collection_cards:
-        qty = cart[str(cc.id)]["quantity"]
-        subtotal = cc.price * qty
+        qty = cart[str(cc.id)]
+        subtotal = get_sell_price(cc) * qty  # safer
         total += subtotal
 
         items.append({
@@ -190,7 +190,8 @@ def create_cart_checkout_session(request):
     reserved_items = []
 
     with transaction.atomic():
-        for card_id, qty in cart.items():
+        for card_id_str, qty in cart.items():
+            card_id = int(card_id_str)  # FIX: convert string to int
             c = CollectionCard.objects.select_for_update().get(id=card_id)
 
             available = c.quantity - c.reserved
