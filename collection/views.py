@@ -41,6 +41,26 @@ def index(request):
         'stripe_publishable_key': os.getenv('STRIPE_PUBLISHABLE_KEY', 'pk_test_...')
     })
 
+def cart_status(request):
+    cart = request.session.get('cart', {})  # Example: {card_id: quantity}
+    cart_count = sum(cart.values())
+
+    # Optional: calculate total
+    total = 0
+    for card_id, qty in cart.items():
+        # Fetch card price
+        try:
+            card = CollectionCard.objects.get(id=card_id)
+            total += card.price * qty
+        except CollectionCard.DoesNotExist:
+            continue
+
+    return JsonResponse({
+        'cart': cart,        # {card_id: qty, ...}
+        'cart_count': cart_count,
+        'total': total
+    })
+
 @require_POST
 def add_to_cart(request):
     data = json.loads(request.body)

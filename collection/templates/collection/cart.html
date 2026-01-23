@@ -189,24 +189,33 @@
   }
 
   // polling to keep cart in sync
-  setInterval(async () => {
-    try {
-      const res = await fetch('/cart/status/', { credentials: 'same-origin' });
-      if (!res.ok) return;
-      const data = await res.json();
-      for (const [cardId, qty] of Object.entries(data.cart || {})) {
-        const qtyEl = document.getElementById(`qty-${cardId}`);
-        if (!qtyEl) continue;
-        if (qty <= 0) {
-          document.querySelector(`.cart-item[data-id='${cardId}']`)?.remove();
-          showFeedback("Item removed (sold out/reserved)", true);
-        } else {
-          qtyEl.textContent = qty;
-        }
+// Auto-refresh cart items for sold-out or reserved products every 5s
+// Auto-refresh cart items for sold-out/reserved products every 5s
+setInterval(async () => {
+  try {
+    const res = await fetch('/cart/status/', { credentials: 'same-origin' });
+    if (!res.ok) return;
+
+    const data = await res.json();
+
+    for (const [cardId, qty] of Object.entries(data.cart)) {
+      const qtyEl = document.getElementById(`qty-${cardId}`);
+      if (!qtyEl) continue;
+
+      if (qty <= 0) {
+        document.querySelector(`.cart-item[data-id='${cardId}']`)?.remove();
+        showFeedback("Item removed (sold out/reserved)", true);
+      } else {
+        qtyEl.textContent = qty;
       }
-      refreshTotals();
-    } catch (e) { console.error(e); }
-  }, 5000);
+    }
+
+    // Update total
+    document.querySelector('.text-xl.font-bold')?.textContent = `Total: $${data.total.toFixed(2)}`;
+  } catch (e) {
+    console.error('Cart status update failed', e);
+  }
+}, 5000);
 </script>
 
 
