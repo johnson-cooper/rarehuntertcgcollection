@@ -42,21 +42,21 @@ def index(request):
     })
 
 def cart_status(request):
-    cart = request.session.get('cart', {})  # Example: {card_id: quantity}
+    cart = request.session.get('cart', {})  # {card_id: quantity}
     cart_count = sum(cart.values())
 
-    # Optional: calculate total
     total = 0
     for card_id, qty in cart.items():
-        # Fetch card price
         try:
-            card = CollectionCard.objects.get(id=card_id)
-            total += card.price * qty
+            card = CollectionCard.objects.get(id=int(card_id))  # convert string to int
+            total += get_sell_price(card) * qty               # use get_sell_price instead of card.price
         except CollectionCard.DoesNotExist:
             continue
+        except Exception as e:
+            print(f"Error calculating cart total for card_id {card_id}: {e}")
 
     return JsonResponse({
-        'cart': cart,        # {card_id: qty, ...}
+        'cart': cart,
         'cart_count': cart_count,
         'total': total
     })
