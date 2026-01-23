@@ -217,7 +217,32 @@ setInterval(async () => {
   }
 }, 5000);
 </script>
+<script>
+document.getElementById('checkoutBtn')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/cart/checkout/', {   // <-- endpoint you need
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF
+      },
+      body: JSON.stringify({})  // cart info is in session, no payload needed
+    });
 
+    const data = await res.json();
+    if (res.ok && data.url) {
+      // redirect to Stripe Checkout
+      window.location.href = data.url;
+    } else {
+      showFeedback(data.error || "Failed to start checkout", true);
+    }
+  } catch (err) {
+    console.error(err);
+    showFeedback("Error starting checkout", true);
+  }
+});
+</script>
 
 </body>
 </html>
