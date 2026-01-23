@@ -27,9 +27,9 @@
           <h2 class="text-lg font-semibold">{{ item.collection_card.card.name }}</h2>
           <div class="text-sm text-zinc-400">{{ item.collection_card.edition }} • {{ item.collection_card.condition }}</div>
           <div class="mt-1 flex items-center gap-2">
-  <button onclick="updateCart({{ item.collection_card.id }}, -1)" class="px-2 py-1 bg-zinc-800 rounded text-white">-</button>
+  <button class="qty-minus" data-id="{{ item.collection_card.id }}">-</button>
   <span id="qty-{{ item.collection_card.id }}">{{ item.quantity }}</span>
-  <button onclick="updateCart({{ item.collection_card.id }}, 1)" class="px-2 py-1 bg-zinc-800 rounded text-white">+</button>
+  <button class="qty-plus" data-id="{{ item.collection_card.id }}">+</button>
   <span id="itemFeedback-{{ item.collection_card.id }}" class="ml-2 text-sm text-yellow-400"></span>
 </div>
 
@@ -37,7 +37,7 @@
       </div>
       <div class="text-right">
         <div class="text-lg font-bold">${{ item.subtotal|floatformat:2 }}</div>
-        <button onclick="removeFromCart({{ item.collection_card.id }})" class="mt-2 text-red-500 hover:underline text-sm">Remove</button>
+        <button class="remove-item" data-id="{{ item.collection_card.id }}">Remove</button>
       </div>
     </div>
     {% endfor %}
@@ -80,6 +80,17 @@
 </script>
 
 <script>
+document.querySelectorAll('.qty-minus').forEach(btn => {
+  btn.addEventListener('click', () => updateCart(btn.dataset.id, -1));
+});
+
+document.querySelectorAll('.qty-plus').forEach(btn => {
+  btn.addEventListener('click', () => updateCart(btn.dataset.id, 1));
+});
+
+document.querySelectorAll('.remove-item').forEach(btn => {
+  btn.addEventListener('click', () => removeFromCart(btn.dataset.id));
+});
   const cartFeedback = document.getElementById('cartFeedback');
 
   function showFeedback(message, isError=false) {
