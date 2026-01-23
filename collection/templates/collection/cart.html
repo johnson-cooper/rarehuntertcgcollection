@@ -222,7 +222,11 @@
   // -------------------------------
   // CHECKOUT BUTTON
   // -------------------------------
-  document.getElementById('checkoutBtn')?.addEventListener('click', async () => {
+ document.addEventListener('DOMContentLoaded', () => {
+  const checkoutBtn = document.getElementById('checkoutBtn');
+  if (!checkoutBtn) return;
+
+  checkoutBtn.addEventListener('click', async () => {
     try {
       const res = await fetch('/cart/checkout/', {
         method: 'POST',
@@ -245,6 +249,7 @@
       window.showFeedback("Error starting checkout", true);
     }
   });
+});
 </script>
 
 
