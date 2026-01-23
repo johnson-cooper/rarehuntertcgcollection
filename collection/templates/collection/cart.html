@@ -80,16 +80,12 @@
 </script>
 
 <script>
-document.querySelectorAll('.qty-minus').forEach(btn => {
-  btn.addEventListener('click', () => updateCart(btn.dataset.id, -1));
-});
+document.addEventListener('click', e => {
+  const target = e.target;
 
-document.querySelectorAll('.qty-plus').forEach(btn => {
-  btn.addEventListener('click', () => updateCart(btn.dataset.id, 1));
-});
-
-document.querySelectorAll('.remove-item').forEach(btn => {
-  btn.addEventListener('click', () => removeFromCart(btn.dataset.id));
+  if (target.matches('.qty-minus')) updateCart(target.dataset.id, -1);
+  if (target.matches('.qty-plus')) updateCart(target.dataset.id, 1);
+  if (target.matches('.remove-item')) removeFromCart(target.dataset.id);
 });
   const cartFeedback = document.getElementById('cartFeedback');
 
@@ -103,71 +99,64 @@ document.querySelectorAll('.remove-item').forEach(btn => {
     }, 2000);
   }
 
-  async function updateCart(collectionCardId, change) {
-    try {
-      const qtyEl = document.getElementById(`qty-${collectionCardId}`);
-      let currentQty = parseInt(qtyEl.textContent);
+ async function updateCart(collectionCardId, change) {
+  try {
+    const qtyEl = document.getElementById(`qty-${collectionCardId}`);
+    let currentQty = parseInt(qtyEl.textContent);
 
-      // Don't allow negative
-      if (currentQty + change < 0) return;
+    if (currentQty + change < 0) return;
 
-      const res = await fetch('/cart/add/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF
-        },
-        body: JSON.stringify({ collection_card_id: collectionCardId, quantity: change })
-      });
+    const res = await fetch('/cart/add/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      credentials: 'same-origin',
+      body: JSON.stringify({ collection_card_id: collectionCardId, quantity: change })
+    });
+    const data = await res.json();
 
-      const data = await res.json();
-
-      if (res.ok) {
-        if (data.cart[collectionCardId] === undefined || data.cart[collectionCardId] <= 0) {
-          // removed automatically if sold out
-          document.querySelector(`#qty-${collectionCardId}`).closest('.flex.items-center').parentElement.parentElement.remove();
-          showFeedback("Item removed (sold out or reserved)", true);
-        } else {
-          // update quantity visually
-          qtyEl.textContent = data.cart[collectionCardId];
-          showFeedback("Cart updated!");
-        }
-
-        // update total badge
-        document.getElementById('cartCount')?.textContent = data.cart_count;
-
-        // optionally refresh totals here
-        refreshTotals();
+    if (res.ok) {
+      if (!data.cart[collectionCardId] || data.cart[collectionCardId] <= 0) {
+        document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
+        showFeedback("Item removed (sold out or reserved)", true);
       } else {
-        showFeedback(data.error || "Cannot update item", true);
+        qtyEl.textContent = data.cart[collectionCardId];
+        showFeedback("Cart updated!");
       }
-    } catch (e) {
-      showFeedback("Error updating cart", true);
-      console.error(e);
+
+      document.getElementById('cartCount')?.textContent = data.cart_count;
+      refreshTotals();
+    } else {
+      showFeedback(data.error || "Cannot update item", true);
     }
+  } catch (e) {
+    showFeedback("Error updating cart", true);
+    console.error(e);
   }
+}
 
   async function removeFromCart(collectionCardId) {
-    try {
-      const res = await fetch('/cart/remove/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-        body: JSON.stringify({ collection_card_id: collectionCardId })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        document.querySelector(`#qty-${collectionCardId}`).closest('.flex.items-center').parentElement.parentElement.remove();
-        showFeedback("Removed from cart");
-        document.getElementById('cartCount')?.textContent = data.cart_count;
-        refreshTotals();
-      } else {
-        showFeedback("Failed to remove item", true);
-      }
-    } catch (e) {
-      showFeedback("Error removing item", true);
-      console.error(e);
+  try {
+    const res = await fetch('/cart/remove/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      credentials: 'same-origin',
+      body: JSON.stringify({ collection_card_id: collectionCardId })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
+      showFeedback("Removed from cart");
+      document.getElementById('cartCount')?.textContent = data.cart_count;
+      refreshTotals();
+    } else {
+      showFeedback(data.error || "Failed to remove item", true);
     }
+  } catch (e) {
+    showFeedback("Error removing item", true);
+    console.error(e);
   }
+}
 
   async function refreshTotals() {
     try {

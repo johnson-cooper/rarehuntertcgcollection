@@ -177,7 +177,7 @@ async function refreshCardStatus(cardId) {
 
     if (product.is_sold_out) {
       // Remove item from cart badge
-      document.getElementById('cartCount').textContent = 0;
+      
 
       // Update UI
       actionDiv.innerHTML =
@@ -250,10 +250,7 @@ async function addToCart(collectionCardId) {
 
     const data = await res.json();
 
-    // Update cart count badge
-    if (data.cart_count !== undefined) {
-      document.getElementById('cartCount').textContent = data.cart_count;
-    }
+
 
     // Show feedback
     if (res.ok) {
