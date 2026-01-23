@@ -20,5 +20,5 @@ urlpatterns = [
     path('privacy/', coll_views.privacy, name='privacy'),
     path('success/', coll_views.success, name='success'),
     path('cancel/', coll_views.cancel, name='cancel'),
-    path('view-cart/', coll_views.cart_view, name='view-cart'),
+    path('cart/', coll_views.cart_view, name='cart'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
