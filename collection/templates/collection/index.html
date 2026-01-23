@@ -17,17 +17,72 @@
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
 <div class="max-w-7xl mx-auto px-4 py-6">
 
-  <!-- Header -->
-  <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+<!-- Navbar -->
+<header class="sticky top-0 z-50 bg-zinc-950 border-b border-zinc-800 px-4 py-2">
+  <div class="max-w-7xl mx-auto flex items-center justify-between">
+
+    <!-- Logo / Brand -->
     <div>
-      <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Rare Hunter TCG</h1>
-      <p class="text-sm text-zinc-400 mt-1">Vintage singles • holos • 1st editions</p>
+      <a href="/" class="flex flex-col sm:flex-row sm:items-center gap-1">
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-100">
+          Rare Hunter TCG
+        </h1>
+        <p class="text-sm text-zinc-400 mt-0 sm:mt-1">
+          Vintage singles • holos • 1st editions
+        </p>
+      </a>
     </div>
-    <div class="flex gap-2 items-center">
-      <div class="text-sm text-zinc-400 hidden sm:block">Showing <span id="displayCount">0</span></div>
-      <button id="refreshBtn" class="px-3 py-2 rounded bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-sm">Refresh</button>
+
+    <!-- Desktop Links + Display Count + Refresh -->
+    <div class="hidden md:flex items-center gap-6">
+      <!-- Links -->
+      <nav class="flex gap-4 text-sm">
+        <a href="/" class="hover:text-indigo-500 transition">Collection</a>
+        <a href="/about" class="hover:text-indigo-500 transition">About</a>
+        <a href="https://instagram.com/rarehunter.tcg" target="_blank"
+           class="hover:text-indigo-500 transition">Instagram</a>
+      </nav>
+
+      <!-- Display count + refresh button -->
+      <div class="flex items-center gap-2">
+        <div class="text-sm text-zinc-400">Showing <span id="displayCount">0</span></div>
+        <button id="refreshBtn"
+                class="px-3 py-2 rounded bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-sm">
+          Refresh
+        </button>
+      </div>
     </div>
-  </header>
+
+    <!-- Mobile Hamburger -->
+    <button id="menuBtn" class="md:hidden text-zinc-100" aria-label="Toggle menu">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
+           viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+
+  </div>
+
+  <!-- Mobile Menu -->
+  <div id="mobileMenu" class="hidden md:hidden border-t border-zinc-800">
+    <nav class="flex flex-col px-4 py-3 gap-2 text-sm bg-zinc-950">
+      <a href="/" class="py-2 hover:text-indigo-500 transition">Collection</a>
+      <a href="/about" class="py-2 hover:text-indigo-500 transition">About</a>
+      <a href="https://instagram.com/rarehunter.tcg" target="_blank"
+         class="py-2 hover:text-indigo-500 transition">Instagram</a>
+
+      <!-- Mobile refresh + count -->
+      <div class="flex items-center gap-2 mt-2">
+        <div class="text-sm text-zinc-400">Showing <span id="displayCountMobile">0</span></div>
+        <button id="refreshBtnMobile"
+                class="px-3 py-2 rounded bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 text-sm">
+          Refresh
+        </button>
+      </div>
+    </nav>
+  </div>
+</header>
 
   <!-- Controls -->
   <section class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
@@ -257,5 +312,37 @@ function debounce(fn,wait=250){let t;return(...a)=>{clearTimeout(t);t=setTimeout
 loadProducts();
 setInterval(refreshStatuses, 3000);
 </script>
+<script>
+  // MOBILE NAVBAR TOGGLE + COUNT SYNC
+  const menuBtn = document.getElementById("menuBtn");
+  const mobileMenu = document.getElementById("mobileMenu");
+
+  menuBtn.addEventListener("click", () => {
+    mobileMenu.classList.toggle("hidden");
+  });
+
+  // Sync display count to mobile menu
+  const displayCount = document.getElementById("displayCount");
+  const displayCountMobile = document.getElementById("displayCountMobile");
+  const refreshBtn = document.getElementById("refreshBtn");
+  const refreshBtnMobile = document.getElementById("refreshBtnMobile");
+
+  function updateDisplayCount(count) {
+    displayCount.textContent = count;
+    displayCountMobile.textContent = count;
+  }
+
+  // Sync refresh button actions
+  refreshBtnMobile.addEventListener("click", () => refreshBtn.click());
+
+  // Hook into your existing render() function:
+  // every time render() updates displayCount, also call:
+  const originalRender = render;
+  render = function(...args) {
+    originalRender(...args);
+    if (displayCountMobile) displayCountMobile.textContent = displayCount.textContent;
+  };
+</script>
+
 </body>
 </html>
