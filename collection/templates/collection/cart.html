@@ -199,7 +199,34 @@
     });
 
     // Poll cart every second
-    setInterval(refreshTotals, 1000);
+    // Poll every second and remove unavailable items
+setInterval(async () => {
+  try {
+    const { res, data: products } = await safeFetch('/api/products/', { credentials: 'same-origin' });
+    if (!res.ok || !products) return;
+
+    let cartChanged = false;
+
+    document.querySelectorAll('.cart-item').forEach(itemEl => {
+      const cardId = itemEl.dataset.id;
+      const product = products.find(p => String(p.id) === cardId);
+      if (!product) return;
+
+      const availableQty = (product.available ?? 0) - (product.reserved ?? 0);
+
+      if (availableQty <= 0 || product.is_sold_out || product.is_reserved) {
+        itemEl.remove();
+        cartChanged = true;
+        window.showFeedback("Item removed (sold out/reserved)", true);
+      }
+    });
+
+    if (cartChanged) refreshTotals();
+  } catch (err) {
+    console.error("Cart polling failed:", err);
+  }
+}, 1000);
+
 
     // Checkout handler
     const checkoutBtn = document.getElementById('checkoutBtn');
