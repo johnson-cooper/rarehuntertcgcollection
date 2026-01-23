@@ -288,30 +288,36 @@ function render(){
 
 async function refreshStatuses() {
   try {
-    const res = await fetch(API_LIST, {credentials: 'same-origin'});
+    const res = await fetch(API_LIST, { credentials: 'same-origin' });
     const latestProducts = await res.json();
 
     latestProducts.forEach(p => {
-      const card = document.querySelector(`.buy-btn[data-id="${p.id}"]`)?.closest('article');
-      if (!card) return; // card not in DOM yet
-
-      const actionDiv = card.querySelector('div.mt-auto');
-      if (!actionDiv) return;
+      const card = document.querySelector(`article a[href="/api/card/${p.id}/"]`)?.closest('article');
+      if (!card) return;
 
       const quantity = typeof p.quantity==='number'?p.quantity:(typeof p.available==='number'?p.available:null);
       const reserved = Number(p.reserved||0);
-      const available = typeof p.available==='number'?p.available:Math.max(0,(quantity||0)-reserved);
+      const available = Math.max(0,(quantity||0)-reserved);
       const status = p.is_sold_out?'soldout':p.is_reserved?'reserved':'available';
 
-      // update button or label dynamically
-      actionDiv.innerHTML = status === 'soldout'
-        ? `<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`
-        : status === 'reserved'
-        ? `<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`
-        : `<div class="px-3 py-2 bg-emerald-600 text-white rounded text-center font-semibold">Available</div>`;
+      // Update top-left badge
+      const badge = card.querySelector('div.absolute.left-3.top-3');
+      if (badge) {
+        badge.textContent = status==='available'?'Available':status==='reserved'?'Reserved':'Sold out';
+        badge.className = `absolute left-3 top-3 px-2 py-1 rounded-full text-xs font-semibold ${
+          status==='available'?'bg-emerald-100 text-emerald-900':
+          status==='reserved'?'bg-amber-100 text-amber-900':'bg-red-100 text-red-900'}`
+      }
 
-      // reattach event listener if button exists
-      
+      // Update bottom button/div
+      const actionDiv = card.querySelector('div.mt-auto');
+      if (actionDiv) {
+        actionDiv.innerHTML = status === 'soldout'
+          ? `<div class="px-3 py-2 bg-red-700 text-white rounded text-center font-semibold">Sold out</div>`
+          : status === 'reserved'
+          ? `<div class="px-3 py-2 bg-amber-500 text-zinc-900 rounded text-center font-semibold">Reserved</div>`
+          : `<div class="px-3 py-2 bg-emerald-600 text-white rounded text-center font-semibold">Available</div>`;
+      }
     });
   } catch(e) {
     console.error("Failed to refresh statuses:", e);

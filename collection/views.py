@@ -42,21 +42,36 @@ def index(request):
     })
 
 def cart_status(request):
-    cart = request.session.get('cart', {})  # {card_id: quantity}
+    cart = request.session.get('cart', {})
     cart_count = sum(cart.values())
-
     total = 0
-    for card_id, qty in cart.items():
+    updated_cart = cart.copy()
+
+    for card_id_str, qty in cart.items():
         try:
-            card = CollectionCard.objects.get(id=int(card_id))  # convert string to int
-            total += get_sell_price(card) * qty               # use get_sell_price instead of card.price
+            card_id = int(card_id_str)
+            card = CollectionCard.objects.get(id=card_id)
+
+            available = card.quantity - card.reserved
+
+            if available <= 0:
+                # remove from cart if sold/reserved
+                updated_cart.pop(card_id_str, None)
+            else:
+                # cap quantity to available stock
+                if qty > available:
+                    updated_cart[card_id_str] = available
+                    qty = available
+                total += get_sell_price(card) * qty
         except CollectionCard.DoesNotExist:
-            continue
-        except Exception as e:
-            print(f"Error calculating cart total for card_id {card_id}: {e}")
+            updated_cart.pop(card_id_str, None)
+
+    request.session['cart'] = updated_cart
+    request.session.modified = True
+    cart_count = sum(updated_cart.values())
 
     return JsonResponse({
-        'cart': cart,
+        'cart': updated_cart,
         'cart_count': cart_count,
         'total': total
     })
@@ -64,30 +79,27 @@ def cart_status(request):
 @require_POST
 def add_to_cart(request):
     data = json.loads(request.body)
-    card_id = str(data["collection_card_id"])
+    card_id = str(data.get("collection_card_id"))
     qty = int(data.get("quantity", 1))
 
     cart = get_cart(request)
 
-    # fetch card
     try:
-        c = CollectionCard.objects.get(id=card_id)
+        card = CollectionCard.objects.get(id=int(card_id))
+        available = card.quantity - card.reserved
+        if available <= 0:
+            cart.pop(card_id, None)
+            save_cart(request)
+            return JsonResponse({"error": "Item sold out", "cart": cart, "cart_count": sum(cart.values())}, status=400)
+
+        # cap to available stock
+        new_qty = min(qty + cart.get(card_id, 0), available)
+        cart[card_id] = new_qty
+        save_cart(request)
+
+        return JsonResponse({"cart": cart, "cart_count": sum(cart.values())})
     except CollectionCard.DoesNotExist:
         return JsonResponse({"error": "Card not found"}, status=404)
-
-    available = c.quantity - c.reserved
-    if available <= 0:
-        # remove from cart if sold out
-        cart.pop(card_id, None)
-        save_cart(request)
-        return JsonResponse({"error": "Item sold out", "cart": cart, "cart_count": sum(cart.values())}, status=400)
-
-    # cap qty to available
-    new_qty = min(qty + cart.get(card_id, 0), available)
-    cart[card_id] = new_qty
-
-    save_cart(request)
-    return JsonResponse({"cart": cart, "cart_count": sum(cart.values())})
 
 @require_POST
 def remove_from_cart(request):
