@@ -240,23 +240,47 @@ const imgObserver=new IntersectionObserver((entries, obs)=>{
 },{rootMargin:'200px'});
 
 // RENDER GRID
+// RENDER GRID
 function render(){
-  const grid=el('grid');
-  const q=el('search').value.trim().toLowerCase();
-  const set=el('setFilter').value;
-  const sort=el('sort').value;
-  grid.innerHTML='';
+  const grid = el('grid');
+  const q = el('search').value.trim().toLowerCase();
+  const set = el('setFilter').value;
+  const sort = el('sort').value;
+  grid.innerHTML = '';
 
-  let filtered=allProducts.filter(p=>(!q||p.name.toLowerCase().includes(q)||String(p.konami_id||'').includes(q))&&(!set||(p.set&&p.set.name===set)));
+  let filtered = allProducts.filter(p => {
+    // If search query exists, check multiple attributes
+    const matchesQuery = !q || [
+      p.name,
+      String(p.konami_id),
+      p.set?.name,
+      p.set?.code,
+      p.edition,
+      p.condition,
+      p.attribute,
+      p.race,
+      p.type,
+      p.misprint
+    ].some(attr => attr && String(attr).toLowerCase().includes(q));
 
+    // Check set filter
+    const matchesSet = !set || (p.set && p.set.name === set);
+
+    return matchesQuery && matchesSet;
+  });
+
+  // Sort
   if(sort==='price_asc') filtered.sort((a,b)=>(a.price_cents||0)-(b.price_cents||0));
   else if(sort==='price_desc') filtered.sort((a,b)=>(b.price_cents||0)-(a.price_cents||0));
 
-  const pageItems=filtered.slice(0,visibleCount);
-  pageItems.forEach(p=>grid.appendChild(buildCard(p)));
-  el('displayCount').textContent=filtered.length;
-  el('loadMore').style.display=(filtered.length>visibleCount)?'inline-block':'none';
+  const pageItems = filtered.slice(0, visibleCount);
+  pageItems.forEach(p => grid.appendChild(buildCard(p)));
+
+  // Update counts
+  el('displayCount').textContent = filtered.length;
+  el('loadMore').style.display = (filtered.length > visibleCount) ? 'inline-block' : 'none';
 }
+
 
 
 
