@@ -81,25 +81,29 @@
 </script>
 
 <script>
-  // CSRF from meta
-window.CSRF = window.CSRF || document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedback');
+  // -------------------------------
+  // GLOBALS (once)
+  // -------------------------------
+  window.CSRF = window.CSRF || document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+  window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedback');
 
-
-  // feedback toast
-
-  function showFeedback(message, isError=false) {
-    if (!cartFeedback) return;
-    cartFeedback.textContent = message;
-    cartFeedback.classList.remove('opacity-0', 'bg-red-600', 'bg-indigo-600');
-    cartFeedback.classList.add(isError ? 'bg-red-600' : 'bg-indigo-600', 'opacity-100');
+  // Global feedback function
+  window.showFeedback = window.showFeedback || function(message, isError=false) {
+    if (!window.cartFeedback) return;
+    window.cartFeedback.textContent = message;
+    window.cartFeedback.classList.remove('opacity-0', 'bg-red-600', 'bg-indigo-600');
+    window.cartFeedback.classList.add(isError ? 'bg-red-600' : 'bg-indigo-600', 'opacity-100');
     setTimeout(() => {
-      cartFeedback.classList.remove('opacity-100');
-      cartFeedback.classList.add('opacity-0');
+      window.cartFeedback.classList.remove('opacity-100');
+      window.cartFeedback.classList.add('opacity-0');
     }, 2000);
-  }
+  };
+</script>
 
-  // event delegation for + / - / remove
+<script>
+  // -------------------------------
+  // CART BUTTONS
+  // -------------------------------
   document.addEventListener('click', e => {
     const t = e.target;
     if (t.matches('.qty-minus')) updateCart(t.dataset.id, -1);
@@ -119,7 +123,7 @@ window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedba
         credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF
+          'X-CSRFToken': window.CSRF
         },
         body: JSON.stringify({ collection_card_id: collectionCardId, quantity: change })
       });
@@ -130,20 +134,20 @@ window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedba
         const newQty = data.cart && data.cart[String(collectionCardId)];
         if (!newQty || newQty <= 0) {
           document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
-          showFeedback("Item removed (sold out or reserved)", true);
+          window.showFeedback("Item removed (sold out or reserved)", true);
         } else {
           qtyEl.textContent = newQty;
-          showFeedback("Cart updated!");
+          window.showFeedback("Cart updated!");
         }
         const cartCountEl = document.getElementById('cartCount');
         if (cartCountEl && data.cart_count !== undefined) cartCountEl.textContent = data.cart_count;
         refreshTotals();
       } else {
-        showFeedback(data.error || "Cannot update item", true);
+        window.showFeedback(data.error || "Cannot update item", true);
       }
     } catch (err) {
       console.error(err);
-      showFeedback("Error updating cart", true);
+      window.showFeedback("Error updating cart", true);
     }
   }
 
@@ -154,7 +158,7 @@ window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedba
         credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF
+          'X-CSRFToken': window.CSRF
         },
         body: JSON.stringify({ collection_card_id: collectionCardId })
       });
@@ -162,16 +166,16 @@ window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedba
 
       if (res.ok) {
         document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
-        showFeedback("Removed from cart");
+        window.showFeedback("Removed from cart");
         const cartCountEl = document.getElementById('cartCount');
         if (cartCountEl && data.cart_count !== undefined) cartCountEl.textContent = data.cart_count;
         refreshTotals();
       } else {
-        showFeedback(data.error || "Failed to remove item", true);
+        window.showFeedback(data.error || "Failed to remove item", true);
       }
     } catch (err) {
       console.error(err);
-      showFeedback("Error removing item", true);
+      window.showFeedback("Error removing item", true);
     }
   }
 
@@ -187,49 +191,37 @@ window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedba
     }
   }
 
-  // polling to keep cart in sync
-// Auto-refresh cart items for sold-out or reserved products every 5s
-// Auto-refresh cart items for sold-out/reserved products every 5s
-setInterval(async () => {
-  try {
-    const res = await fetch('/cart/status/', { credentials: 'same-origin' });
-    if (!res.ok) return;
+  // -------------------------------
+  // AUTO REFRESH CART
+  // -------------------------------
+  setInterval(async () => {
+    try {
+      const res = await fetch('/cart/status/', { credentials: 'same-origin' });
+      if (!res.ok) return;
 
-    const data = await res.json();
+      const data = await res.json();
 
-    for (const [cardId, qty] of Object.entries(data.cart)) {
-      const qtyEl = document.getElementById(`qty-${cardId}`);
-      if (!qtyEl) continue;
+      for (const [cardId, qty] of Object.entries(data.cart)) {
+        const qtyEl = document.getElementById(`qty-${cardId}`);
+        if (!qtyEl) continue;
 
-      if (qty <= 0) {
-        document.querySelector(`.cart-item[data-id='${cardId}']`)?.remove();
-        showFeedback("Item removed (sold out/reserved)", true);
-      } else {
-        qtyEl.textContent = qty;
+        if (qty <= 0) {
+          document.querySelector(`.cart-item[data-id='${cardId}']`)?.remove();
+          window.showFeedback("Item removed (sold out/reserved)", true);
+        } else {
+          qtyEl.textContent = qty;
+        }
       }
+
+      document.querySelector('.text-xl.font-bold')?.textContent = `Total: $${data.total.toFixed(2)}`;
+    } catch (e) {
+      console.error('Cart status update failed', e);
     }
+  }, 5000);
 
-    // Update total
-    document.querySelector('.text-xl.font-bold')?.textContent = `Total: $${data.total.toFixed(2)}`;
-  } catch (e) {
-    console.error('Cart status update failed', e);
-  }
-}, 5000);
-</script>
-<script>
-  // Existing CSRF & showFeedback code here
-  function showFeedback(message, isError=false) {
-    if (!cartFeedback) return;
-    cartFeedback.textContent = message;
-    cartFeedback.classList.remove('opacity-0', 'bg-red-600', 'bg-indigo-600');
-    cartFeedback.classList.add(isError ? 'bg-red-600' : 'bg-indigo-600', 'opacity-100');
-    setTimeout(() => {
-      cartFeedback.classList.remove('opacity-100');
-      cartFeedback.classList.add('opacity-0');
-    }, 2000);
-  }
-
-  // --- Checkout button ---
+  // -------------------------------
+  // CHECKOUT BUTTON
+  // -------------------------------
   document.getElementById('checkoutBtn')?.addEventListener('click', async () => {
     try {
       const res = await fetch('/cart/checkout/', {
@@ -237,7 +229,7 @@ setInterval(async () => {
         credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': CSRF
+          'X-CSRFToken': window.CSRF
         },
         body: JSON.stringify({})
       });
@@ -246,14 +238,16 @@ setInterval(async () => {
       if (res.ok && data.url) {
         window.location.href = data.url;
       } else {
-        showFeedback(data.error || "Failed to start checkout", true);
+        window.showFeedback(data.error || "Failed to start checkout", true);
       }
     } catch (err) {
       console.error(err);
-      showFeedback("Error starting checkout", true);
+      window.showFeedback("Error starting checkout", true);
     }
   });
 </script>
+
+
 
 </body>
 </html>
