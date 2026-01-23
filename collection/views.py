@@ -8,12 +8,18 @@ import stripe
 import time
 from django.db import transaction
 from django.shortcuts import render, get_object_or_404
-
+from django.views.decorators.http import require_POST
 
 def get_sell_price(card: CollectionCard) -> float:
     return card.effective_mid or card.value_mid or 0
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
+
+def get_cart(request):
+    return request.session.setdefault("cart", {})
+
+def save_cart(request):
+    request.session.modified = True
 
 def about(request):
     return render(request, "collection/about.html")
@@ -33,6 +39,60 @@ def cancel(request):
 def index(request):
     return render(request, 'collection/index.html', {
         'stripe_publishable_key': os.getenv('STRIPE_PUBLISHABLE_KEY', 'pk_test_...')
+    })
+
+@require_POST
+def add_to_cart(request):
+    data = json.loads(request.body)
+    card_id = str(data["collection_card_id"])
+    qty = int(data.get("quantity", 1))
+
+    cart = get_cart(request)
+    cart[card_id] = cart.get(card_id, 0) + qty
+    save_cart(request)
+
+    return JsonResponse({"cart": cart})
+
+@require_POST
+def remove_from_cart(request):
+    data = json.loads(request.body)
+    card_id = str(data["collection_card_id"])
+
+    cart = get_cart(request)
+    cart.pop(card_id, None)
+    save_cart(request)
+
+    return JsonResponse({"cart": cart})
+
+
+
+def cart_view(request):
+    cart = request.session.get("cart", {})
+
+    items = []
+    total = 0
+
+    collection_cards = (
+        CollectionCard.objects
+        .select_related("card")  # avoid extra queries
+        .filter(id__in=cart.keys())
+    )
+
+    for cc in collection_cards:
+        qty = cart[str(cc.id)]["quantity"]
+        subtotal = cc.price * qty
+        total += subtotal
+
+        items.append({
+            "collection_card": cc,
+            "card": cc.card,          # convenience for template
+            "quantity": qty,
+            "subtotal": subtotal,
+        })
+
+    return render(request, "cart.html", {
+        "items": items,
+        "total": total
     })
 
 def api_products(request):
@@ -119,6 +179,64 @@ def card_detail(request, card_id):
     return render(request, 'collection/card_detail.html', {
         'product': product
     })
+
+@csrf_exempt
+def create_cart_checkout_session(request):
+    cart = get_cart(request)
+    if not cart:
+        return JsonResponse({"error": "Cart empty"}, status=400)
+
+    line_items = []
+    reserved_items = []
+
+    with transaction.atomic():
+        for card_id, qty in cart.items():
+            c = CollectionCard.objects.select_for_update().get(id=card_id)
+
+            available = c.quantity - c.reserved
+            if available < qty:
+                raise Exception(f"Not enough stock for {c.card.name}")
+
+            c.reserved += qty
+            c.save()
+
+            price = get_sell_price(c)
+            images = (
+                [request.build_absolute_uri(c.images.first().img.url)]
+                if c.images.exists() else []
+            )
+
+            line_items.append({
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {
+                        "name": c.card.name,
+                        "description": f"{c.edition} • {c.condition}",
+                        "images": images
+                    },
+                    "unit_amount": int(price * 100)
+                },
+                "quantity": qty
+            })
+
+            reserved_items.append({
+                "id": c.id,
+                "qty": qty
+            })
+
+        session = stripe.checkout.Session.create(
+            mode="payment",
+            payment_method_types=["card"],
+            line_items=line_items,
+            shipping_address_collection={"allowed_countries": ["US"]},
+            success_url=f"{settings.BASE_URL}/success/",
+            cancel_url=f"{settings.BASE_URL}/cancel/",
+            metadata={
+                "items": json.dumps(reserved_items)
+            }
+        )
+
+    return JsonResponse({"url": session.url})
 
 @csrf_exempt
 def create_checkout_session(request):
