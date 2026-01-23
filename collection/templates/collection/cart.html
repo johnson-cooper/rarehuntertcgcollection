@@ -81,37 +81,23 @@
 </script>
 
 <script>
-
-/*
-  Put this script at the bottom of <body> (replace your current cart scripts).
-  Requires: <meta name="csrf-token" content="{{ csrf_token }}"> in <head>
-  Requires: an element with id="cartFeedback" and id="checkoutBtn" in the page (you already have them).
-*/
-
 (function () {
-  // Make CSRF accessible globally (only set if not already set)
   window.CSRF = window.CSRF || (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '');
-
-  // We'll wait for DOMContentLoaded so all elements exist
   document.addEventListener('DOMContentLoaded', () => {
-    // Elements
-    window.cartFeedback = window.cartFeedback || document.getElementById('cartFeedback');
+    window.cartFeedback = document.getElementById('cartFeedback');
 
-    // Define global showFeedback once (safe to call window.showFeedback anywhere)
-    window.showFeedback = window.showFeedback || function (message, isError=false) {
+    window.showFeedback = function (message, isError=false) {
       const el = window.cartFeedback;
       if (!el) return;
       el.textContent = message;
       el.classList.remove('opacity-0', 'bg-red-600', 'bg-indigo-600');
       el.classList.add(isError ? 'bg-red-600' : 'bg-indigo-600', 'opacity-100');
-      // hide after 2s
       setTimeout(() => {
         el.classList.remove('opacity-100');
         el.classList.add('opacity-0');
       }, 2000);
     };
 
-    // Helper: fetch JSON safely
     async function safeFetch(url, opts) {
       const res = await fetch(url, opts);
       let data;
@@ -119,164 +105,138 @@
       return { res, data };
     }
 
-    // Update quantity (sends delta `quantity` value to /cart/add/)
     async function updateCart(collectionCardId, change) {
-      try {
-        const qtyEl = document.getElementById(`qty-${collectionCardId}`);
-        if (!qtyEl) return;
-        const currentQty = parseInt(qtyEl.textContent) || 0;
-        if (currentQty + change < 0) return;
+      const qtyEl = document.getElementById(`qty-${collectionCardId}`);
+      if (!qtyEl) return;
+      const currentQty = parseInt(qtyEl.textContent) || 0;
+      if (currentQty + change < 0) return;
 
-        const { res, data } = await safeFetch('/cart/add/', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': window.CSRF
-          },
-          body: JSON.stringify({ collection_card_id: collectionCardId, quantity: change })
-        });
+      const { res, data } = await safeFetch('/cart/add/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': window.CSRF
+        },
+        body: JSON.stringify({ collection_card_id: collectionCardId, quantity: change })
+      });
 
-        if (res.ok) {
-          const newQty = data?.cart && data.cart[String(collectionCardId)];
-          if (!newQty || newQty <= 0) {
-            document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
-            window.showFeedback("Item removed (sold out or reserved)", true);
-          } else {
-            qtyEl.textContent = newQty;
-            window.showFeedback("Cart updated!");
-          }
-          // update cart count badge if present
-          const cartCountEl = document.getElementById('cartCount');
-          if (cartCountEl && data?.cart_count !== undefined) cartCountEl.textContent = data.cart_count;
-          refreshTotals();
-        } else {
-          window.showFeedback(data?.error || "Cannot update item", true);
-        }
-      } catch (err) {
-        console.error("updateCart error:", err);
-        window.showFeedback("Error updating cart", true);
-      }
-    }
-
-    // Remove item completely
-    async function removeFromCart(collectionCardId) {
-      try {
-        const { res, data } = await safeFetch('/cart/remove/', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': window.CSRF
-          },
-          body: JSON.stringify({ collection_card_id: collectionCardId })
-        });
-
-        if (res.ok) {
+      if (res.ok) {
+        const newQty = data?.cart && data.cart[String(collectionCardId)];
+        if (!newQty || newQty <= 0) {
           document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
-          window.showFeedback("Removed from cart");
-          const cartCountEl = document.getElementById('cartCount');
-          if (cartCountEl && data?.cart_count !== undefined) cartCountEl.textContent = data.cart_count;
-          refreshTotals();
+          window.showFeedback("Item removed (sold out/reserved)", true);
         } else {
-          window.showFeedback(data?.error || "Failed to remove item", true);
+          qtyEl.textContent = newQty;
+          window.showFeedback("Cart updated!");
         }
-      } catch (err) {
-        console.error("removeFromCart error:", err);
-        window.showFeedback("Error removing item", true);
+        refreshTotals();
+      } else {
+        window.showFeedback(data?.error || "Cannot update item", true);
       }
     }
 
-    // Refresh totals using /cart/status/
+    async function removeFromCart(collectionCardId) {
+      const { res, data } = await safeFetch('/cart/remove/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': window.CSRF
+        },
+        body: JSON.stringify({ collection_card_id: collectionCardId })
+      });
+
+      if (res.ok) {
+        document.querySelector(`.cart-item[data-id='${collectionCardId}']`)?.remove();
+        window.showFeedback("Removed from cart");
+        refreshTotals();
+      } else {
+        window.showFeedback(data?.error || "Failed to remove item", true);
+      }
+    }
+
     async function refreshTotals() {
-      try {
-        const { res, data } = await safeFetch('/cart/status/', { credentials: 'same-origin' });
-        if (!res.ok || !data) return;
-        const totalEl = document.querySelector('.text-xl.font-bold');
-        if (totalEl && data.total !== undefined) totalEl.textContent = `Total: $${data.total.toFixed(2)}`;
-      } catch (e) {
-        console.error('refreshTotals failed', e);
+      const { res, data } = await safeFetch('/cart/status/', { credentials: 'same-origin' });
+      if (!res.ok || !data) return;
+
+      // Update each cart item
+      let cartBlocked = false;
+      for (const [cardId, qty] of Object.entries(data.cart || {})) {
+        const qtyEl = document.getElementById(`qty-${cardId}`);
+        const itemEl = document.querySelector(`.cart-item[data-id='${cardId}']`);
+        if (!qtyEl || !itemEl) continue;
+
+        if (qty <= 0) {
+          itemEl.remove();
+          window.showFeedback("Item removed (sold out/reserved)", true);
+          cartBlocked = true;
+        } else {
+          qtyEl.textContent = qty;
+        }
+      }
+
+      // Update total display
+      const totalEl = document.querySelector('.text-xl.font-bold');
+      if (totalEl && data.total !== undefined) totalEl.textContent = `Total: $${data.total.toFixed(2)}`;
+
+      // Disable checkout if any items removed or cart empty
+      const checkoutBtn = document.getElementById('checkoutBtn');
+      if (checkoutBtn) {
+        const anyItems = Object.values(data.cart || {}).some(q => q > 0);
+        checkoutBtn.disabled = !anyItems;
+        checkoutBtn.classList.toggle('opacity-50', !anyItems);
+        checkoutBtn.classList.toggle('cursor-not-allowed', !anyItems);
       }
     }
 
     // Event delegation for +/- and remove
     document.addEventListener('click', e => {
       const t = e.target;
-      if (t.matches('.qty-minus')) {
-        updateCart(t.dataset.id, -1);
-      } else if (t.matches('.qty-plus')) {
-        updateCart(t.dataset.id, 1);
-      } else if (t.matches('.remove-item')) {
-        removeFromCart(t.dataset.id);
-      }
+      if (t.matches('.qty-minus')) updateCart(t.dataset.id, -1);
+      else if (t.matches('.qty-plus')) updateCart(t.dataset.id, 1);
+      else if (t.matches('.remove-item')) removeFromCart(t.dataset.id);
     });
 
-    // Auto-refresh polling (keeps cart in sync with server availability)
-    setInterval(async () => {
-      try {
-        const { res, data } = await safeFetch('/cart/status/', { credentials: 'same-origin' });
-        if (!res.ok || !data) return;
+    // Poll cart every second
+    setInterval(refreshTotals, 1000);
 
-        for (const [cardId, qty] of Object.entries(data.cart || {})) {
-          const qtyEl = document.getElementById(`qty-${cardId}`);
-          if (!qtyEl) continue;
-          if (qty <= 0) {
-            document.querySelector(`.cart-item[data-id='${cardId}']`)?.remove();
-            window.showFeedback("Item removed (sold out/reserved)", true);
-          } else {
-            qtyEl.textContent = qty;
-          }
-        }
-
-        // update total display
-        const totalEl = document.querySelector('.text-xl.font-bold');
-        if (totalEl && data.total !== undefined) totalEl.textContent = `Total: $${data.total.toFixed(2)}`;
-      } catch (err) {
-        console.error('Polling failed', err);
-      }
-    }, 5000);
-
-    // Attach checkout handler (button should exist now)
+    // Checkout handler
     const checkoutBtn = document.getElementById('checkoutBtn');
     if (checkoutBtn) {
       checkoutBtn.addEventListener('click', async () => {
-        try {
-          // quick UI feedback
-          window.showFeedback("Starting checkout...");
+        const { res, data } = await safeFetch('/cart/status/', { credentials: 'same-origin' });
+        if (!res.ok || !data) { window.showFeedback("Cannot verify cart", true); return; }
 
-          const { res, data } = await safeFetch('/cart/checkout/', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': window.CSRF
-            },
-            body: JSON.stringify({})
-          });
-
-          console.log("cart/checkout response:", res.status, data);
-
-          if (res.ok && data?.url) {
-            // redirect to stripe
-            window.location.href = data.url;
-          } else {
-            window.showFeedback(data?.error || "Failed to start checkout", true);
-          }
-        } catch (err) {
-          console.error("checkout error:", err);
-          window.showFeedback("Error starting checkout", true);
+        // Prevent checkout if any items unavailable
+        const unavailable = Object.entries(data.cart || {}).filter(([_, qty]) => qty <= 0);
+        if (unavailable.length > 0) {
+          window.showFeedback("Some items are no longer available", true);
+          unavailable.forEach(([cardId]) => document.querySelector(`.cart-item[data-id='${cardId}']`)?.remove());
+          refreshTotals();
+          return;
         }
+
+        // Start checkout
+        window.showFeedback("Starting checkout...");
+        const { res: res2, data: data2 } = await safeFetch('/cart/checkout/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': window.CSRF },
+          body: JSON.stringify({})
+        });
+
+        if (res2.ok && data2?.url) window.location.href = data2.url;
+        else window.showFeedback(data2?.error || "Failed to start checkout", true);
       });
-    } else {
-      // If button missing, log for debugging
-      console.warn("checkoutBtn not found on page when script ran");
     }
 
-    // run initial totals refresh
+    // Initial totals refresh
     refreshTotals();
-  }); // DOMContentLoaded
-})(); // IIFE
+  });
+})();
 </script>
+
 
 
 
