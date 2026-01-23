@@ -9,12 +9,6 @@ import time
 from django.db import transaction
 from django.shortcuts import render, get_object_or_404
 
-def card_status(request, card_id):
-    card = get_object_or_404(CollectionCard, id=card_id)
-    return JsonResponse({
-        "is_sold_out": card.is_sold_out,
-        "is_reserved": card.is_reserved,
-    })
 
 def get_sell_price(card: CollectionCard) -> float:
     return card.effective_mid or card.value_mid or 0
