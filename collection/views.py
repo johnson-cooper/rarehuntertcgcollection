@@ -241,7 +241,7 @@ def create_cart_checkout_session(request):
 
     with transaction.atomic():
         for card_id_str, qty in cart.items():
-            card_id = int(card_id_str)  # FIX: convert string to int
+            card_id = int(card_id_str)
             c = CollectionCard.objects.select_for_update().get(id=card_id)
 
             available = c.quantity - c.reserved
@@ -252,10 +252,7 @@ def create_cart_checkout_session(request):
             c.save()
 
             price = get_sell_price(c)
-            images = (
-                [request.build_absolute_uri(c.images.first().img.url)]
-                if c.images.exists() else []
-            )
+            images = [request.build_absolute_uri(c.images.first().img.url)] if c.images.exists() else []
 
             line_items.append({
                 "price_data": {
@@ -275,6 +272,10 @@ def create_cart_checkout_session(request):
                 "qty": qty
             })
 
+        # Set session to expire in 30 minutes
+        expires_in_seconds = 30 * 60
+        expires_at = int(time.time()) + expires_in_seconds
+
         session = stripe.checkout.Session.create(
             mode="payment",
             payment_method_types=["card"],
@@ -284,7 +285,8 @@ def create_cart_checkout_session(request):
             cancel_url=f"{settings.BASE_URL}/cancel/",
             metadata={
                 "items": json.dumps(reserved_items)
-            }
+            },
+            expires_at=expires_at  # <-- this makes the session auto-expire
         )
 
     return JsonResponse({"url": session.url})
