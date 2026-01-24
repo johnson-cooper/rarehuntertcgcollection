@@ -284,6 +284,7 @@ def create_cart_checkout_session(request):
             success_url=f"{settings.BASE_URL}/success/",
             cancel_url=f"{settings.BASE_URL}/cancel/",
             metadata={
+                "source": "rarehunter_cart",
                 "items": json.dumps(reserved_items)
             },
             expires_at=expires_at  # <-- this makes the session auto-expire
@@ -348,6 +349,7 @@ def create_checkout_session(request):
                 cancel_url=f"{settings.BASE_URL}/cancel/",
                 expires_at=expires_at,  # <-- set expiration
                 metadata={
+                    "source": "rarehunter_cart",
                     'collection_card_id': str(c.id),
                     'reserved_qty': str(qty),
                     'konami_id': str(c.card.konami_id),
