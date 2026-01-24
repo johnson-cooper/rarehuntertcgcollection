@@ -261,58 +261,86 @@ def create_cart_checkout_session(request):
     line_items = []
     reserved_items = []
 
-    with transaction.atomic():
-        for card_id_str, qty in cart.items():
-            card_id = int(card_id_str)
-            c = CollectionCard.objects.select_for_update().get(id=card_id)
+    try:
+        with transaction.atomic():
+            for card_id_str, qty in cart.items():
+                card_id = int(card_id_str)
 
-            available = c.quantity - c.reserved
-            if available < qty:
-                raise Exception(f"Not enough stock for {c.card.name}")
+                c = (
+                    CollectionCard.objects
+                    .select_for_update()
+                    .get(id=card_id)
+                )
 
-            c.reserved += qty
-            c.save()
+                available = c.quantity - c.reserved
+                if available < qty:
+                    raise ValueError(
+                        f"Not enough stock for {c.card.name}"
+                    )
 
-            price = get_sell_price(c)
-            images = [request.build_absolute_uri(c.images.first().img.url)] if c.images.exists() else []
+                c.reserved += qty
+                c.save()
 
-            line_items.append({
-                "price_data": {
-                    "currency": "usd",
-                    "product_data": {
-                        "name": c.card.name,
-                        "description": f"{c.edition} • {c.condition}",
-                        "images": images
+                price = get_sell_price(c)
+                images = (
+                    [request.build_absolute_uri(c.images.first().img.url)]
+                    if c.images.exists() else []
+                )
+
+                line_items.append({
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {
+                            "name": c.card.name,
+                            "description": f"{c.edition} • {c.condition}",
+                            "images": images
+                        },
+                        "unit_amount": int(price * 100)
                     },
-                    "unit_amount": int(price * 100)
+                    "quantity": qty
+                })
+
+                reserved_items.append({
+                    "id": c.id,
+                    "qty": qty
+                })
+
+            expires_at = int(time.time()) + (30 * 60)
+
+            session = stripe.checkout.Session.create(
+                mode="payment",
+                payment_method_types=["card"],
+                line_items=line_items,
+                shipping_address_collection={"allowed_countries": ["US"]},
+                success_url=f"{settings.BASE_URL}/success/",
+                cancel_url=f"{settings.BASE_URL}/cancel/",
+                metadata={
+                    "source": "rarehunter_cart",
+                    "items": json.dumps(reserved_items)
                 },
-                "quantity": qty
-            })
+                expires_at=expires_at
+            )
 
-            reserved_items.append({
-                "id": c.id,
-                "qty": qty
-            })
-
-        # Set session to expire in 30 minutes
-        expires_in_seconds = 30 * 60
-        expires_at = int(time.time()) + expires_in_seconds
-
-        session = stripe.checkout.Session.create(
-            mode="payment",
-            payment_method_types=["card"],
-            line_items=line_items,
-            shipping_address_collection={"allowed_countries": ["US"]},
-            success_url=f"{settings.BASE_URL}/success/",
-            cancel_url=f"{settings.BASE_URL}/cancel/",
-            metadata={
-                "source": "rarehunter_cart",
-                "items": json.dumps(reserved_items)
-            },
-            expires_at=expires_at  # <-- this makes the session auto-expire
+    except ValueError as e:
+        # Inventory conflict
+        return JsonResponse(
+            {"error": str(e)},
+            status=409
         )
 
+    except Exception:
+        # Unexpected failure
+        return JsonResponse(
+            {"error": "Checkout failed"},
+            status=500
+        )
+
+    # Clear cart only AFTER session succeeds
+    request.session["cart"] = {}
+    request.session.modified = True
+
     return JsonResponse({"url": session.url})
+
 
 @csrf_exempt
 def create_checkout_session(request):
@@ -395,55 +423,83 @@ def stripe_webhook(request):
     sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
     webhook_secret = settings.STRIPE_WEBHOOK_SECRET
 
-    # Verify webhook
-    if webhook_secret:
-        try:
-            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-        except (ValueError, stripe.error.SignatureVerificationError):
-            return HttpResponse(status=400)
-    else:
-        try:
+    # --- Verify webhook ---
+    try:
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(
+                payload, sig_header, webhook_secret
+            )
+        else:
             event = json.loads(payload)
-        except Exception:
-            return HttpResponse(status=400)
+    except Exception:
+        return HttpResponse(status=400)
 
-    # Handle events
-    if event.get('type') == 'checkout.session.completed':
-        sess = event['data']['object']
-        card_id = int(sess['metadata']['collection_card_id'])
-        reserved_qty = int(sess['metadata']['reserved_qty'])
+    event_type = event.get("type")
+    sess = event["data"]["object"]
+    metadata = sess.get("metadata", {})
 
+    # --- helper to parse reserved items ---
+    def get_reserved_items():
+        """
+        Returns a list of dicts:
+        [{ "id": int, "qty": int }, ...]
+        """
+        # Cart checkout
+        if "items" in metadata:
+            return json.loads(metadata["items"])
+
+        # Single-item checkout (legacy)
+        if "collection_card_id" in metadata and "reserved_qty" in metadata:
+            return [{
+                "id": int(metadata["collection_card_id"]),
+                "qty": int(metadata["reserved_qty"])
+            }]
+
+        return []
+
+    reserved_items = get_reserved_items()
+
+    # --- PAYMENT COMPLETED ---
+    if event_type == "checkout.session.completed":
         with transaction.atomic():
-            # --- finalize stock ---
-            c = CollectionCard.objects.select_for_update().get(id=card_id)
-            c.quantity -= reserved_qty
-            c.reserved -= reserved_qty
-            c.save()
-            print(f"Payment completed: {reserved_qty} of {c.card.name} sold.")
+            for item in reserved_items:
+                c = CollectionCard.objects.select_for_update().get(id=item["id"])
+                qty = item["qty"]
 
-            # --- create order ---
-            items = stripe.checkout.Session.list_line_items(sess['id'], limit=100)
-            shipping = sess.get('shipping') or {}
-            customer_email = sess.get('customer_details', {}).get('email', '')
+                c.quantity -= qty
+                c.reserved -= qty
+                c.save()
+
+                print(f"Sold {qty} of {c.card.name}")
+
+            # Create order (once per session)
+            items = stripe.checkout.Session.list_line_items(sess["id"], limit=100)
+            shipping = sess.get("shipping") or {}
+            customer_email = sess.get("customer_details", {}).get("email", "")
 
             Order.objects.create(
-                stripe_order_id=sess['id'],
+                stripe_order_id=sess["id"],
                 email=customer_email,
-                shipping_name=shipping.get('name', ''),
-                shipping_address=shipping.get('address', {}),
-                status='paid',
-                items=[{'description': li.description, 'quantity': li.quantity} for li in items.data]
+                shipping_name=shipping.get("name", ""),
+                shipping_address=shipping.get("address", {}),
+                status="paid",
+                items=[
+                    {"description": li.description, "quantity": li.quantity}
+                    for li in items.data
+                ]
             )
 
-    elif event.get('type') in ['checkout.session.expired', 'payment_intent.payment_failed']:
-        sess = event['data']['object']
-        card_id = int(sess['metadata']['collection_card_id'])
-        reserved_qty = int(sess['metadata']['reserved_qty'])
-
+    # --- PAYMENT FAILED OR SESSION EXPIRED ---
+    elif event_type in (
+        "checkout.session.expired",
+        "payment_intent.payment_failed",
+    ):
         with transaction.atomic():
-            c = CollectionCard.objects.select_for_update().get(id=card_id)
-            c.reserved -= reserved_qty  # release reserved stock
-            c.save()
-            print(f"Payment failed or expired: {reserved_qty} of {c.card.name} released.")
+            for item in reserved_items:
+                c = CollectionCard.objects.select_for_update().get(id=item["id"])
+                c.reserved -= item["qty"]
+                c.save()
+
+                print(f"Released {item['qty']} of {c.card.name}")
 
     return HttpResponse(status=200)
