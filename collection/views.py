@@ -118,32 +118,54 @@ def remove_from_cart(request):
 
 def cart_view(request):
     cart = request.session.get("cart", {})
+    updated_cart = {}
 
     items = []
     total = 0
 
     collection_cards = (
         CollectionCard.objects
-        .select_related("card")  # avoid extra queries
+        .select_related("card")
         .filter(id__in=cart.keys())
     )
 
     for cc in collection_cards:
-        qty = cart[str(cc.id)]
-        subtotal = get_sell_price(cc) * qty  # safer
+        cart_qty = int(cart.get(str(cc.id), 0))
+        available = max(cc.quantity - cc.reserved, 0)
+
+        # ❌ Item no longer available → drop it
+        if available <= 0 or cart_qty <= 0:
+            continue
+
+        # ✅ Clamp quantity to availability
+        qty = min(cart_qty, available)
+
+        price = get_sell_price(cc)
+        subtotal = price * qty
+
         total += subtotal
 
         items.append({
             "collection_card": cc,
-            "card": cc.card,          # convenience for template
+            "card": cc.card,
             "quantity": qty,
             "subtotal": subtotal,
         })
+
+        updated_cart[str(cc.id)] = qty
+
+    # 🔒 Never allow negative totals
+    total = max(total, 0)
+
+    # 🧹 Persist cleaned cart
+    request.session["cart"] = updated_cart
+    request.session.modified = True
 
     return render(request, "collection/cart.html", {
         "items": items,
         "total": total
     })
+
 
 def api_products(request):
     qs = (
@@ -425,4 +447,3 @@ def stripe_webhook(request):
             print(f"Payment failed or expired: {reserved_qty} of {c.card.name} released.")
 
     return HttpResponse(status=200)
-
