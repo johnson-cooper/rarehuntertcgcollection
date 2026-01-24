@@ -152,67 +152,106 @@
 </script>
 
 <script>
+(function () {
+  // get csrftoken helper (same as your other pages)
   function getCookie(name) {
     const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
     return m ? decodeURIComponent(m[2]) : null;
   }
-  const CSRF = getCookie('csrftoken');
+  window.CSRF = window.CSRF || getCookie('csrftoken');
 
-  document.querySelectorAll('.thumb-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const src = btn.getAttribute('data-src');
-      if (!src) return;
-      const main = document.getElementById('mainImage');
-      main.src = src;
-      document.querySelectorAll('.thumb-btn').forEach(t => t.classList.remove('thumb-selected'));
-      btn.classList.add('thumb-selected');
-    });
-  });
+  const CARD_ID = {{ product.id }};            // Django will render this
+  const POLL_MS = 3000;                        // poll interval (1s)
+  const buyAction = document.getElementById('buyAction');
+  if (!buyAction) return;
 
-async function refreshCardStatus(cardId) {
-  try {
-    const res = await fetch(`/api/card-status/${cardId}/`, { credentials: 'same-origin' });
-    if (!res.ok) return;
+  // Save the original HTML so we can restore it when available again
+  const originalBuyHTML = buyAction.innerHTML;
+  let lastStatus = null;
 
-    const product = await res.json();
+  // Update UI based on status object returned from /api/card-status/
+  function applyStatusUI(status) {
+    // If unchanged, skip
+    if (JSON.stringify(status) === JSON.stringify(lastStatus)) return;
+    lastStatus = status;
 
-    const actionDiv = document.getElementById('buyBtn')?.parentElement;
-    if (!actionDiv) return;
-
-    if (product.is_sold_out) {
-      // Remove item from cart badge
-      
-
-      // Update UI
-      actionDiv.innerHTML =
-        `<div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">
+    // If sold out -> replace with red badge
+    if (status.is_sold_out) {
+      buyAction.innerHTML = `
+        <div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">
           Sold out
-        </div>`;
+        </div>
+      `;
+      return;
     }
-  } catch (e) {
-    console.error('Failed to refresh card status:', e);
-  }
-}
 
-setInterval(() => refreshCardStatus({{ product.id }}), 3000);
-  async function buy(id) {
+    // If reserved -> replace with amber badge (temporarily unavailable)
+    if (status.is_reserved) {
+      buyAction.innerHTML = `
+        <div class="px-4 py-2 bg-amber-500 text-zinc-900 rounded-md inline-block font-semibold">
+          Reserved — temporarily unavailable
+        </div>
+      `;
+      return;
+    }
+
+    // Otherwise restore original UI (available)
+    buyAction.innerHTML = originalBuyHTML;
+    // Inline onclicks in the restored HTML will call the global functions addToCart / requestToBuy
+    // Ensure those functions exist globally (they already are in your template)
+  }
+
+  // Fetch status from server
+  async function fetchStatus() {
     try {
-      const res = await fetch('/api/create-checkout-session/', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
-        body: JSON.stringify({ collection_card_id: id, quantity: 1 })
-      });
-      const j = await res.json();
-      if (res.ok && j.url) {
-        window.location.href = j.url;
-      } else {
-        alert(j.error || 'Checkout failed');
-      }
-    } catch (e) {
-      alert('Checkout error: ' + (e.message || e));
+      const res = await fetch(`/api/card-status/${CARD_ID}/`, { credentials: 'same-origin' });
+      if (!res.ok) return; // don't overwrite UI on transient errors
+      const status = await res.json();
+      applyStatusUI(status);
+    } catch (err) {
+      console.error('fetchStatus error', err);
     }
   }
+
+  // Wrap addToCart/requestToBuy so they check status immediately before acting
+  // (prevents starting checkout or adding to cart on an item that just became reserved)
+  const origAddToCart = window.addToCart;
+  window.addToCart = async function (collectionCardId) {
+    try {
+      const res = await fetch(`/api/card-status/${collectionCardId}/`, { credentials: 'same-origin' });
+      if (res.ok) {
+        const st = await res.json();
+        if (st.is_sold_out) return showFeedback('Item just sold out', true);
+        if (st.is_reserved) return showFeedback('Item is reserved, try again later', true);
+      }
+    } catch (e) { console.warn('status check failed', e); }
+    // proceed to original
+    return origAddToCart(collectionCardId);
+  };
+
+  const origRequestToBuy = window.requestToBuy;
+  window.requestToBuy = async function (collectionCardId) {
+    try {
+      const res = await fetch(`/api/card-status/${collectionCardId}/`, { credentials: 'same-origin' });
+      if (res.ok) {
+        const st = await res.json();
+        if (st.is_sold_out) return alert('Item just sold out');
+        if (st.is_reserved) return alert('Item is reserved, try again later');
+      }
+    } catch (e) { console.warn('status check failed', e); }
+    return origRequestToBuy(collectionCardId);
+  };
+
+  // Optionally ensure `showFeedback` exists (your template defines it already)
+  window.showFeedback = window.showFeedback || function (msg, err) {
+    console[err ? 'error' : 'log'](msg);
+  };
+
+  // Start polling immediately and then every POLL_MS
+  fetchStatus();
+  setInterval(fetchStatus, POLL_MS);
+})();
+</script>
 
   
 
