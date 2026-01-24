@@ -91,7 +91,7 @@
         <!-- Buy Action -->
         <div class="mt-4" id="buyAction">
             <p class="p-4">
-  Payments are made securely with Stripe. When requesting to buy, the item will be on hold for you for 30 minutes to complete payment.
+  Payments are processed securely with Stripe. When requesting to buy, the item will be on hold to you for 10-30 minutes to complete payment.
         </p>
           {% if product.is_sold_out %}
             <div class="px-4 py-2 bg-red-700 text-white rounded-md inline-block font-semibold">Sold out</div>
@@ -108,7 +108,7 @@
     onclick="addToCart({{ product.id }})">
     Add to cart
   </button>
-  <a href="/cart/" class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-500">View Cart</a>
+  <a href="/cart/" class="px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-500 flex items-center justify-center">View Cart</a>
   <div id="cartFeedback" class="fixed top-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded shadow-lg opacity-0 transition-opacity duration-300 z-50"></div>
 </div>
           {% endif %}
